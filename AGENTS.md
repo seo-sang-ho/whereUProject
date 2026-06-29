@@ -245,3 +245,6 @@ DTO
 * 인증/인가 누락 여부
 * 예외 처리 누락 여부
 * 로그 민감 정보 노출 여부
+
+whereU 프로젝트 작업 후 의미 있는 변경이 있으면 Notion `whereU 개발 로그` DB에 기록한다.
+민감정보(API Key, serviceKey, DB/JWT 비밀값, .env)는 절대 기록하지 않고 `[REDACTED]` 처리한다.
