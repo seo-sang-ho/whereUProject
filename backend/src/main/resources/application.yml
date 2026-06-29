@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: whereU
+
+tourism:
+  open-api:
+    base-url: ${TOURISM_OPEN_API_BASE_URL:}
+    demand-endpoint: ${TOURISM_DEMAND_ENDPOINT:/areaTarSjrnDsList}
+    service-key: ${TOURISM_OPEN_API_SERVICE_KEY:}
+    mobile-os: ETC
+    mobile-app: whereU
+    demand:
+      base-ym: ${TOURISM_DEMAND_BASE_YM:202509}
+      area-cd: ${TOURISM_DEMAND_AREA_CD:11}
+      signgu-cd: ${TOURISM_DEMAND_SIGNGU_CD:11530}
+      indicator-code: ${TOURISM_DEMAND_INDICATOR_CODE:21}
