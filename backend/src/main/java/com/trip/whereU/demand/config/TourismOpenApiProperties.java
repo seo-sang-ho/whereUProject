@@ -1,5 +1,6 @@
 package com.trip.whereU.demand.config;
 
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "tourism.open-api")
@@ -14,8 +15,7 @@ public record TourismOpenApiProperties(
 
 	public record Demand(
 			String baseYm,
-			String areaCd,
-			String signguCd,
+			List<String> areaCodes,
 			String indicatorCode
 	) {
 	}

@@ -2,6 +2,7 @@ package com.trip.whereU.demand.client;
 
 import com.trip.whereU.demand.config.TourismOpenApiProperties;
 import com.trip.whereU.demand.dto.TourismDemandOpenApiItem;
+import com.trip.whereU.demand.dto.TourismDemandOpenApiPage;
 import java.net.URI;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -29,24 +30,24 @@ public class TourismDemandOpenApiClient {
 		this.restClient = RestClient.create();
 	}
 
-	public List<TourismDemandOpenApiItem> fetchDemandItems(int pageNo, int numOfRows) {
+	public TourismDemandOpenApiPage fetchDemandPage(String areaCode, int pageNo, int numOfRows) {
 		validateProperties();
-		URI uri = buildDemandUri(pageNo, numOfRows, properties.serviceKey());
+		URI uri = buildDemandUri(areaCode, pageNo, numOfRows, properties.serviceKey());
 
 		String responseBody = restClient.get()
 				.uri(uri)
 				.retrieve()
 				.body(String.class);
 
-		return parseItems(responseBody);
+		return parsePage(responseBody);
 	}
 
 	public String buildMaskedDemandUri(int pageNo, int numOfRows) {
 		validateProperties();
-		return buildDemandUri(pageNo, numOfRows, "***").toString();
+		return buildDemandUri(properties.demand().areaCodes().get(0), pageNo, numOfRows, "***").toString();
 	}
 
-	URI buildDemandUri(int pageNo, int numOfRows, String serviceKey) {
+	URI buildDemandUri(String areaCode, int pageNo, int numOfRows, String serviceKey) {
 		String encodedQuery = UriComponentsBuilder
 				.newInstance()
 				.queryParam("pageNo", pageNo)
@@ -54,8 +55,7 @@ public class TourismDemandOpenApiClient {
 				.queryParam("MobileOS", properties.mobileOs())
 				.queryParam("MobileApp", properties.mobileApp())
 				.queryParam("baseYm", properties.demand().baseYm())
-				.queryParam("areaCd", properties.demand().areaCd())
-				.queryParam("signguCd", properties.demand().signguCd())
+				.queryParam("areaCd", areaCode)
 				.queryParam("tarSjrnDsIxCd", properties.demand().indicatorCode())
 				.queryParam("_type", "json")
 				.build()
@@ -78,28 +78,40 @@ public class TourismDemandOpenApiClient {
 				|| !StringUtils.hasText(properties.serviceKey())
 				|| properties.demand() == null
 				|| !StringUtils.hasText(properties.demand().baseYm())
-				|| !StringUtils.hasText(properties.demand().areaCd())
-				|| !StringUtils.hasText(properties.demand().signguCd())
+				|| properties.demand().areaCodes() == null
+				|| properties.demand().areaCodes().isEmpty()
+				|| properties.demand().areaCodes().stream().anyMatch(areaCode -> !StringUtils.hasText(areaCode))
 				|| !StringUtils.hasText(properties.demand().indicatorCode())) {
 			throw new IllegalStateException(
-					"한국관광공사 OpenAPI 설정이 필요합니다. TOURISM_OPEN_API_BASE_URL, TOURISM_OPEN_API_SERVICE_KEY, TOURISM_DEMAND_BASE_YM, TOURISM_DEMAND_AREA_CD, TOURISM_DEMAND_SIGNGU_CD, TOURISM_DEMAND_INDICATOR_CODE를 확인하세요."
+					"한국관광공사 OpenAPI 설정이 필요합니다. TOURISM_OPEN_API_BASE_URL, TOURISM_OPEN_API_SERVICE_KEY, TOURISM_DEMAND_BASE_YM, TOURISM_DEMAND_AREA_CODES, TOURISM_DEMAND_INDICATOR_CODE를 확인하세요."
 			);
 		}
 	}
 
-	private List<TourismDemandOpenApiItem> parseItems(String responseBody) {
+	TourismDemandOpenApiPage parsePage(String responseBody) {
 		try {
 			JsonNode root = objectMapper.readTree(responseBody);
-			JsonNode itemNode = root.path("response").path("body").path("items").path("item");
+			JsonNode response = root.path("response");
+			JsonNode header = response.path("header");
+			String resultCode = header.path("resultCode").asText();
+			if (!"0000".equals(resultCode)) {
+				throw new IllegalStateException(
+						"관광 수요 강도 OpenAPI 오류: code=" + resultCode + ", message=" + header.path("resultMsg").asText()
+				);
+			}
+
+			JsonNode body = response.path("body");
+			JsonNode itemNode = body.path("items").path("item");
 			List<JsonNode> itemNodes = toItemNodes(itemNode);
 
 			List<TourismDemandOpenApiItem> items = new ArrayList<>();
 			for (JsonNode node : itemNodes) {
 				String regionCode = buildRegionCode(node);
 				String regionName = buildRegionName(node);
+				String districtCode = firstText(node, "signguCd", "signguCode", "sigunguCode");
 				Double demandScore = firstDouble(
 						node,
-                        "tarSjrnDsIxVal",
+						"tarSjrnDsIxVal",
 						"demandScore",
 						"demandStrength",
 						"tourDemandScore",
@@ -119,6 +131,7 @@ public class TourismDemandOpenApiClient {
 				items.add(new TourismDemandOpenApiItem(
 						regionCode,
 						regionName,
+						districtCode,
 						demandScore,
 						firstDouble(node, "latitude", "lat", "mapY"),
 						firstDouble(node, "longitude", "lng", "lon", "mapX"),
@@ -130,7 +143,12 @@ public class TourismDemandOpenApiClient {
 						"관광 수요 강도 OpenAPI 응답 필드명 매핑이 필요합니다. 첫 응답 필드: " + collectFieldNames(itemNodes.get(0))
 				);
 			}
-			return items;
+			return new TourismDemandOpenApiPage(
+					items,
+					body.path("pageNo").asInt(1),
+					body.path("numOfRows").asInt(items.size()),
+					body.path("totalCount").asInt(items.size())
+			);
 		} catch (Exception exception) {
 			if (exception instanceof IllegalStateException illegalStateException) {
 				throw illegalStateException;
