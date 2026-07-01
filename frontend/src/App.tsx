@@ -1,121 +1,123 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect, useRef, useState } from 'react'
+import { loadNaverMaps } from './lib/naverMaps'
 import './App.css'
 
+type MapStatus = 'loading' | 'ready' | 'missing-key' | 'error'
+
+const naverMapClientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID?.trim()
+
+const stayStrengthLevels = [
+  { label: '낮음', className: 'low' },
+  { label: '보통', className: 'medium' },
+  { label: '높음', className: 'high' },
+]
+
 function App() {
-  const [count, setCount] = useState(0)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const [mapStatus, setMapStatus] = useState<MapStatus>(
+    naverMapClientId ? 'loading' : 'missing-key',
+  )
+
+  useEffect(() => {
+    let map: naver.maps.Map | undefined
+    let cancelled = false
+
+    if (!naverMapClientId) {
+      return
+    }
+
+    loadNaverMaps(naverMapClientId)
+      .then(() => {
+        if (cancelled || !mapContainerRef.current) {
+          return
+        }
+
+        map = new window.naver.maps.Map(mapContainerRef.current, {
+          center: new window.naver.maps.LatLng(36.35, 127.8),
+          zoom: 7,
+          minZoom: 6,
+          maxZoom: 18,
+          zoomControl: true,
+          zoomControlOptions: {
+            position: window.naver.maps.Position.TOP_RIGHT,
+          },
+          mapDataControl: false,
+          scaleControl: false,
+        })
+        setMapStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMapStatus('error')
+        }
+      })
+
+    return () => {
+      cancelled = true
+      map?.destroy()
+    }
+  }, [])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <main className="app-shell">
+      <header className="app-header">
+        <a className="brand" href="/" aria-label="whereU 홈">
+          <span className="brand-mark" aria-hidden="true">W</span>
+          <span>whereU</span>
+        </a>
+        <div className="view-title">
+          <span className="view-title-dot" aria-hidden="true" />
+          관광 체류강도
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+        <span className="data-source">한국관광공사 데이터</span>
+      </header>
+
+      <section className="map-workspace" aria-label="전국 관광 체류강도 지도">
+        <div ref={mapContainerRef} className="map-canvas" />
+
+        <aside className="map-panel">
+          <div className="panel-heading">
+            <span className="panel-eyebrow">전국 시군구</span>
+            <h1>관광 체류강도</h1>
+            <p>최신 기준월</p>
+          </div>
+
+          <div className="legend" aria-label="체류강도 범례">
+            {stayStrengthLevels.map((level) => (
+              <div className="legend-item" key={level.className}>
+                <span className={`legend-swatch ${level.className}`} aria-hidden="true" />
+                <span>{level.label}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        {mapStatus !== 'ready' && (
+          <div className="map-status" role="status">
+            {mapStatus === 'loading' && (
+              <>
+                <span className="loading-indicator" aria-hidden="true" />
+                <strong>지도를 불러오는 중</strong>
+              </>
+            )}
+            {mapStatus === 'missing-key' && (
+              <>
+                <span className="status-symbol" aria-hidden="true">!</span>
+                <strong>지도 인증 정보가 필요합니다</strong>
+                <p><code>VITE_NAVER_MAP_CLIENT_ID</code>를 설정해 주세요.</p>
+              </>
+            )}
+            {mapStatus === 'error' && (
+              <>
+                <span className="status-symbol" aria-hidden="true">!</span>
+                <strong>지도를 불러오지 못했습니다</strong>
+                <p>Client ID와 Web 서비스 URL을 확인해 주세요.</p>
+              </>
+            )}
+          </div>
+        )}
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </main>
   )
 }
 
