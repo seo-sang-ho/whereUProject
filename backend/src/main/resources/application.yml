@@ -5,11 +5,17 @@ spring:
 tourism:
   open-api:
     base-url: ${TOURISM_OPEN_API_BASE_URL:}
-    demand-endpoint: ${TOURISM_DEMAND_ENDPOINT:/areaTarSjrnDsList}
+    stay-strength-endpoint: ${TOURISM_STAY_STRENGTH_ENDPOINT:${TOURISM_DEMAND_ENDPOINT:/areaTarSjrnDsList}}
     service-key: ${TOURISM_OPEN_API_SERVICE_KEY:}
     mobile-os: ETC
     mobile-app: whereU
-    demand:
-      base-ym: ${TOURISM_DEMAND_BASE_YM:202509}
-      area-codes: ${TOURISM_DEMAND_AREA_CODES:11,26,27,28,29,30,31,36,41,43,44,46,47,48,50,51,52}
-      indicator-code: ${TOURISM_DEMAND_INDICATOR_CODE:21}
+    stay-strength:
+      base-ym: ${TOURISM_STAY_STRENGTH_BASE_YM:${TOURISM_DEMAND_BASE_YM:202509}}
+      area-codes: ${TOURISM_STAY_STRENGTH_AREA_CODES:${TOURISM_DEMAND_AREA_CODES:11,26,27,28,29,30,31,36,41,43,44,46,47,48,50,51,52}}
+      indicator-code: ${TOURISM_STAY_STRENGTH_INDICATOR_CODE:${TOURISM_DEMAND_INDICATOR_CODE:21}}
+
+naver:
+  maps:
+    geocoding-base-url: ${NAVER_MAPS_GEOCODING_BASE_URL:https://maps.apigw.ntruss.com/map-geocode/v2/geocode}
+    api-key-id: ${NAVER_MAPS_API_KEY_ID:}
+    api-key: ${NAVER_MAPS_API_KEY:}

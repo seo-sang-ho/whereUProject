@@ -18,13 +18,20 @@ public class GlobalExceptionHandler {
 				.body(ApiResponse.failure(exception.getMessage()));
 	}
 
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
+		return ResponseEntity
+				.badRequest()
+				.body(ApiResponse.failure(exception.getMessage()));
+	}
+
 	@ExceptionHandler(RestClientException.class)
 	public ResponseEntity<ApiResponse<Void>> handleRestClientException(RestClientException exception) {
 		if (exception instanceof RestClientResponseException responseException) {
 			return ResponseEntity
 					.status(HttpStatus.BAD_GATEWAY)
-					.body(ApiResponse.failure(
-							"한국관광공사 OpenAPI 호출에 실패했습니다. status="
+						.body(ApiResponse.failure(
+								"외부 API 호출에 실패했습니다. status="
 									+ responseException.getStatusCode()
 									+ ", body="
 									+ shorten(responseException.getResponseBodyAsString())
@@ -32,7 +39,7 @@ public class GlobalExceptionHandler {
 		}
 		return ResponseEntity
 				.status(HttpStatus.BAD_GATEWAY)
-				.body(ApiResponse.failure("한국관광공사 OpenAPI 호출에 실패했습니다. " + exception.getMessage()));
+				.body(ApiResponse.failure("외부 API 호출에 실패했습니다. " + exception.getMessage()));
 	}
 
 	@ExceptionHandler(Exception.class)
