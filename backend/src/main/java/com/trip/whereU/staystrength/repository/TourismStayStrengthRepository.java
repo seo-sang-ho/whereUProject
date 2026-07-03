@@ -26,6 +26,9 @@ public interface TourismStayStrengthRepository extends JpaRepository<TourismStay
 	@Query("select max(d.referenceDate) from TourismStayStrength d")
 	Optional<LocalDate> findLatestReferenceDate();
 
+	@Query("select distinct d.referenceDate from TourismStayStrength d order by d.referenceDate desc")
+	List<LocalDate> findReferenceDatesDescending();
+
 	@Query("""
 			select distinct
 				d.regionCode as regionCode,
