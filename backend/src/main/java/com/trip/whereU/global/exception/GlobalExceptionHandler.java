@@ -1,6 +1,7 @@
 package com.trip.whereU.global.exception;
 
 import com.trip.whereU.global.dto.ApiResponse;
+import com.trip.whereU.resourcedemand.exception.ResourceDemandSyncAlreadyRunningException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,6 +11,15 @@ import org.springframework.web.client.RestClientResponseException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	@ExceptionHandler(ResourceDemandSyncAlreadyRunningException.class)
+	public ResponseEntity<ApiResponse<Void>> handleSyncAlreadyRunning(
+			ResourceDemandSyncAlreadyRunningException exception
+	) {
+		return ResponseEntity
+				.status(HttpStatus.CONFLICT)
+				.body(ApiResponse.failure(exception.getMessage()));
+	}
 
 	@ExceptionHandler(IllegalStateException.class)
 	public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException exception) {
