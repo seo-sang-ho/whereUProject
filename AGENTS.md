@@ -282,6 +282,8 @@ whereU 프로젝트에서 의미 있는 코드나 문서 변경이 완료되면 
 
 커밋 메시지는 `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:` 형식을 사용한다.
 
+Conventional Commit 접두사 뒤의 제목과 필요한 본문은 한국어로 작성한다.
+
 메시지는 `add files`, `update code`처럼 파일 작업만 설명하지 않고 사용자 관점의 변경 결과를 표현한다.
 
 다음 파일은 자동 스테이징 및 커밋하지 않는다.
