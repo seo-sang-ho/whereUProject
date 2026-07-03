@@ -13,6 +13,17 @@ tourism:
       base-ym: ${TOURISM_STAY_STRENGTH_BASE_YM:${TOURISM_DEMAND_BASE_YM:202509}}
       area-codes: ${TOURISM_STAY_STRENGTH_AREA_CODES:${TOURISM_DEMAND_AREA_CODES:11,26,27,28,29,30,31,36,41,43,44,46,47,48,50,51,52}}
       indicator-code: ${TOURISM_STAY_STRENGTH_INDICATOR_CODE:${TOURISM_DEMAND_INDICATOR_CODE:21}}
+  resource-demand-api:
+    base-url: ${TOURISM_RESOURCE_DEMAND_BASE_URL:https://apis.data.go.kr/B551011/AreaTarResDemService}
+    service-demand-endpoint: ${TOURISM_SERVICE_DEMAND_ENDPOINT:/areaTarSvcDemList}
+    cultural-resource-demand-endpoint: ${TOURISM_CULTURAL_RESOURCE_DEMAND_ENDPOINT:/areaCulResDemList}
+    service-key: ${TOURISM_OPEN_API_SERVICE_KEY:}
+    mobile-os: ETC
+    mobile-app: whereU
+    service-demand:
+      base-ym: ${TOURISM_SERVICE_DEMAND_BASE_YM:${TOURISM_STAY_STRENGTH_BASE_YM:${TOURISM_DEMAND_BASE_YM:202509}}}
+      area-codes: ${TOURISM_SERVICE_DEMAND_AREA_CODES:11,26,27,28,29,30,31,36,41,43,44,46,47,48,50,51,52}
+      indicator-code: ${TOURISM_SERVICE_DEMAND_INDICATOR_CODE:11}
 
 naver:
   maps:
