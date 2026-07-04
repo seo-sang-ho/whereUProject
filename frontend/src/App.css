@@ -100,7 +100,7 @@
 
 .map-mode-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   margin-bottom: 18px;
   padding: 3px;
@@ -335,6 +335,69 @@
   padding-bottom: 14px;
 }
 
+.theme-filter {
+  margin: 12px 0 0;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 1px solid #e6e9eb;
+}
+
+.theme-filter legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: #59656c;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.theme-options label {
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  color: #667279;
+  background: #f4f6f7;
+  border: 1px solid #dfe4e6;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.theme-options label:hover {
+  color: #26332c;
+  border-color: #b8c9bf;
+}
+
+.theme-options label.is-selected {
+  color: #205b3d;
+  background: #eaf4ee;
+  border-color: #9fc7ae;
+}
+
+.theme-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.theme-options label:has(input:focus-visible) {
+  outline: 2px solid #3d8f62;
+  outline-offset: 1px;
+}
+
 .recommendation-list {
   display: flex;
   flex-direction: column;
@@ -443,6 +506,34 @@
 
 .recommendation-metrics b {
   color: #25342b;
+}
+
+.personalized-detail {
+  grid-column: 2 / 4;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.personalized-detail .recommendation-metrics {
+  grid-column: auto;
+}
+
+.theme-score-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.theme-score-list > span {
+  padding: 3px 5px;
+  color: #4f6257;
+  background: #f4f7f5;
+  border: 1px solid #dce7e0;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .empty-recommendations {
@@ -571,6 +662,7 @@
   font-size: 12px;
   font-weight: 650;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .map-status {
@@ -725,7 +817,10 @@
 
   .data-error {
     top: 12px;
-    max-width: calc(100% - 24px);
-    width: max-content;
+    right: 56px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+    transform: none;
   }
 }

@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import Supercluster from 'supercluster'
 import { useLatestStayStrengths } from './hooks/useLatestStayStrengths'
+import { usePersonalizedRecommendations } from './hooks/usePersonalizedRecommendations'
 import { useValueRecommendations } from './hooks/useValueRecommendations'
 import { loadNaverMaps } from './lib/naverMaps'
+import type { PersonalizedRecommendation, TourismTheme } from './types/personalizedRecommendation'
 import type { GeoBounds, StayStrengthLevel, StayStrengthRegion } from './types/stayStrength'
 import type { ValueRecommendation } from './types/valueRecommendation'
 import './App.css'
 
 type MapStatus = 'loading' | 'ready' | 'missing-key' | 'error'
-type MapMode = 'strength' | 'recommendation'
+type MapMode = 'strength' | 'recommendation' | 'personalized'
+
+type MapRecommendation = ValueRecommendation | PersonalizedRecommendation
 
 interface MapOverlay {
   marker: naver.maps.Marker
@@ -31,6 +35,15 @@ const stayStrengthLevels = [
   { level: 'MEDIUM', label: '보통', className: 'medium' },
   { level: 'HIGH', label: '높음', className: 'high' },
 ] as const
+
+const tourismThemes: Array<{ value: TourismTheme; label: string }> = [
+  { value: 'NATURE', label: '자연' },
+  { value: 'CULTURE_HISTORY', label: '문화·역사' },
+  { value: 'ACTIVITY', label: '액티비티' },
+  { value: 'FOOD', label: '미식' },
+  { value: 'SHOPPING', label: '쇼핑' },
+  { value: 'HEALING_STAY', label: '힐링·숙박' },
+]
 
 const markerColors: Record<StayStrengthLevel, string> = {
   LOW: '#31975b',
@@ -76,8 +89,13 @@ function App() {
   const [bounds, setBounds] = useState<GeoBounds | null>(null)
   const [selectedRegion, setSelectedRegion] = useState<StayStrengthRegion | null>(null)
   const [selectedRecommendationCode, setSelectedRecommendationCode] = useState<string | null>(null)
+  const [selectedThemes, setSelectedThemes] = useState<TourismTheme[]>(['NATURE'])
   const stayStrengthQuery = useLatestStayStrengths(mapMode === 'strength' ? bounds : null)
   const recommendationQuery = useValueRecommendations(mapMode === 'recommendation')
+  const personalizedQuery = usePersonalizedRecommendations(
+    selectedThemes,
+    mapMode === 'personalized',
+  )
 
   useEffect(() => {
     let map: naver.maps.Map | undefined
@@ -150,8 +168,10 @@ function App() {
       return
     }
 
-    if (mapMode === 'recommendation') {
-      const recommendations = recommendationQuery.data?.recommendations ?? []
+    if (mapMode !== 'strength') {
+      const recommendations = mapMode === 'personalized'
+        ? personalizedQuery.data?.recommendations ?? []
+        : recommendationQuery.data?.recommendations ?? []
       overlaysRef.current = recommendations.flatMap((recommendation) => {
         if (recommendation.latitude === null || recommendation.longitude === null) {
           return []
@@ -252,6 +272,7 @@ function App() {
   }, [
     bounds,
     mapMode,
+    personalizedQuery.data,
     recommendationQuery.data,
     selectedRecommendationCode,
     stayStrengthQuery.data,
@@ -261,7 +282,7 @@ function App() {
     setMapMode(mode)
     setSelectedRegion(null)
     setSelectedRecommendationCode(null)
-    if (mode === 'recommendation' && mapRef.current) {
+    if (mode !== 'strength' && mapRef.current) {
       mapRef.current.morph(
         new window.naver.maps.LatLng(nationwideCenter.latitude, nationwideCenter.longitude),
         7,
@@ -269,7 +290,7 @@ function App() {
     }
   }
 
-  const selectRecommendation = (recommendation: ValueRecommendation) => {
+  const selectRecommendation = (recommendation: MapRecommendation) => {
     setSelectedRecommendationCode(recommendation.regionCode)
     if (
       mapRef.current
@@ -283,11 +304,21 @@ function App() {
     }
   }
 
+  const toggleTheme = (theme: TourismTheme) => {
+    setSelectedThemes((current) => current.includes(theme)
+      ? current.filter((item) => item !== theme)
+      : [...current, theme])
+    setSelectedRecommendationCode(null)
+  }
+
   const visibleCount = stayStrengthQuery.data?.stayStrengths.length ?? 0
   const recommendations = recommendationQuery.data?.recommendations ?? []
+  const personalizedRecommendations = personalizedQuery.data?.recommendations ?? []
   const hasDataError = mapMode === 'strength'
     ? stayStrengthQuery.isError
-    : recommendationQuery.isError
+    : mapMode === 'personalized'
+      ? personalizedQuery.isError
+      : recommendationQuery.isError
 
   return (
     <main className="app-shell">
@@ -298,7 +329,11 @@ function App() {
         </a>
         <div className="view-title">
           <span className="view-title-dot" aria-hidden="true" />
-          {mapMode === 'strength' ? '관광 체류강도' : '가성비 여행지'}
+          {mapMode === 'strength'
+            ? '관광 체류강도'
+            : mapMode === 'personalized'
+              ? '개인 맞춤 여행지'
+              : '가성비 여행지'}
         </div>
         <span className="data-source">한국관광공사 데이터</span>
       </header>
@@ -306,7 +341,7 @@ function App() {
       <section className="map-workspace" aria-label="관광 데이터 지도">
         <div ref={mapContainerRef} className="map-canvas" />
 
-        <aside className={`map-panel${mapMode === 'recommendation' ? ' map-panel--recommendation' : ''}`}>
+        <aside className={`map-panel${mapMode !== 'strength' ? ' map-panel--recommendation' : ''}`}>
           <div className="map-mode-tabs" role="tablist" aria-label="지도 데이터 선택">
             <button
               type="button"
@@ -325,6 +360,15 @@ function App() {
               onClick={() => changeMapMode('recommendation')}
             >
               가성비 추천
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mapMode === 'personalized'}
+              className={mapMode === 'personalized' ? 'is-active' : ''}
+              onClick={() => changeMapMode('personalized')}
+            >
+              맞춤 추천
             </button>
           </div>
 
@@ -377,7 +421,7 @@ function App() {
                 </div>
               )}
             </>
-          ) : (
+          ) : mapMode === 'recommendation' ? (
             <>
               <div className="panel-heading recommendation-heading">
                 <span className="panel-eyebrow">전국 추천 TOP {recommendations.length}</span>
@@ -421,9 +465,89 @@ function App() {
                 <div className="empty-recommendations">추천 계산에 필요한 공통 기준월 데이터가 없습니다.</div>
               )}
             </>
+          ) : (
+            <>
+              <div className="panel-heading recommendation-heading">
+                <span className="panel-eyebrow">맞춤 추천 TOP {personalizedRecommendations.length}</span>
+                <h1>내 취향 여행지</h1>
+                <p>{formatReferenceMonth(personalizedQuery.data?.referenceDate)}</p>
+              </div>
+
+              <fieldset className="theme-filter">
+                <legend>선호 테마</legend>
+                <div className="theme-options">
+                  {tourismThemes.map((theme) => (
+                    <label
+                      className={selectedThemes.includes(theme.value) ? 'is-selected' : ''}
+                      key={theme.value}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedThemes.includes(theme.value)}
+                        onChange={() => toggleTheme(theme.value)}
+                      />
+                      <span>{theme.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <ol className="recommendation-list" aria-label="개인 맞춤 여행지 추천 순위">
+                {personalizedRecommendations.map((recommendation) => {
+                  const selected = recommendation.regionCode === selectedRecommendationCode
+                  return (
+                    <li key={recommendation.regionCode}>
+                      <button
+                        type="button"
+                        className={selected ? 'recommendation-item is-selected' : 'recommendation-item'}
+                        aria-pressed={selected}
+                        onClick={() => selectRecommendation(recommendation)}
+                      >
+                        <span className="recommendation-rank">{recommendation.rank}</span>
+                        <span className="recommendation-copy">
+                          <strong>{recommendation.regionName}</strong>
+                          <span>{recommendation.interpretation}</span>
+                        </span>
+                        <span className="recommendation-score">
+                          {recommendation.recommendationScorePercent}
+                          <small>점</small>
+                        </span>
+                        {selected && (
+                          <span className="personalized-detail">
+                            <span className="recommendation-metrics">
+                              <span>테마 적합도 <b>{Math.round(recommendation.normalizedThemeDemand * 100)}</b></span>
+                              <span>체류강도 <b>{Math.round(recommendation.normalizedStayStrength * 100)}</b></span>
+                            </span>
+                            <span className="theme-score-list">
+                              {recommendation.themeScores.map((score) => (
+                                <span key={score.theme}>
+                                  {score.themeLabel} {Math.round(score.normalizedScore * 100)}
+                                </span>
+                              ))}
+                            </span>
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ol>
+
+              {selectedThemes.length === 0 && (
+                <div className="empty-recommendations">선호 테마를 하나 이상 선택해 주세요.</div>
+              )}
+              {selectedThemes.length > 0
+                && !personalizedQuery.isLoading
+                && personalizedRecommendations.length === 0
+                && !personalizedQuery.isError && (
+                <div className="empty-recommendations">선택 테마와 공통 기준월을 만족하는 지역이 없습니다.</div>
+              )}
+            </>
           )}
 
-          {(stayStrengthQuery.isFetching || recommendationQuery.isFetching) && (
+          {(stayStrengthQuery.isFetching
+            || recommendationQuery.isFetching
+            || personalizedQuery.isFetching) && (
             <div className="panel-progress" role="status">
               <span className="panel-spinner" aria-hidden="true" />
               {mapMode === 'strength' ? '지역 데이터 갱신 중' : '추천 순위 계산 중'}
