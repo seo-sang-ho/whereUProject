@@ -74,6 +74,8 @@ class TourismResourceDemandServiceTest {
 		assertThat(response.savedCount()).isEqualTo(17);
 		assertThat(response.successfulIndicatorCount()).isEqualTo(17);
 		assertThat(response.skippedIndicatorCount()).isZero();
+		assertThat(response.bulkCollectedResourceTypes()).containsExactly("SERVICE", "CULTURE");
+		assertThat(response.fallbackResourceTypes()).isEmpty();
 		assertThat(response.failedIndicators()).isEmpty();
 	}
 
@@ -98,6 +100,8 @@ class TourismResourceDemandServiceTest {
 		);
 		assertThat(response.successfulIndicatorCount()).isEqualTo(17);
 		assertThat(response.savedCount()).isEqualTo(17);
+		assertThat(response.bulkCollectedResourceTypes()).containsExactly("CULTURE");
+		assertThat(response.fallbackResourceTypes()).containsExactly("SERVICE");
 	}
 
 	@Test

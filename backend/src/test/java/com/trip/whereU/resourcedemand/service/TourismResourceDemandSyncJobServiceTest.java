@@ -89,6 +89,8 @@ class TourismResourceDemandSyncJobServiceTest {
 				17 - failedIndicators.size(),
 				0,
 				List.of(),
+				List.of("SERVICE", "CULTURE"),
+				List.of(),
 				failedIndicators
 		);
 	}

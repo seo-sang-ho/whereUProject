@@ -77,6 +77,7 @@ public class TourismResourceDemandService {
 			try {
 				syncResourceTypeInBulk(resourceType, result, referenceDate);
 			} catch (BulkCollectionException | RestClientException | IllegalStateException exception) {
+				result.recordFallback(resourceType);
 				syncIndicators(
 						Map.of(resourceType, pendingIndicatorCodes), result, referenceDate
 				);
@@ -276,6 +277,8 @@ public class TourismResourceDemandService {
 		private int successfulIndicatorCount;
 		private LocalDate referenceDate;
 		private final List<String> skippedIndicators = new ArrayList<>();
+		private final List<String> bulkCollectedResourceTypes = new ArrayList<>();
+		private final List<String> fallbackResourceTypes = new ArrayList<>();
 		private final List<String> failedIndicators = new ArrayList<>();
 
 		private void recordSuccess(
@@ -310,6 +313,7 @@ public class TourismResourceDemandService {
 			}
 			savedCount += savedItems;
 			successfulIndicatorCount += indicatorCount;
+			bulkCollectedResourceTypes.add(resourceType.name());
 			updateReferenceDate(items);
 		}
 
@@ -323,6 +327,10 @@ public class TourismResourceDemandService {
 
 		private void recordFailure(ResourceDemandType resourceType, String indicatorCode) {
 			failedIndicators.add(resourceType.name() + ":" + indicatorCode);
+		}
+
+		private void recordFallback(ResourceDemandType resourceType) {
+			fallbackResourceTypes.add(resourceType.name());
 		}
 
 		private void recordSkipped(
@@ -345,6 +353,8 @@ public class TourismResourceDemandService {
 					successfulIndicatorCount,
 					skippedIndicators.size(),
 					List.copyOf(skippedIndicators),
+					List.copyOf(bulkCollectedResourceTypes),
+					List.copyOf(fallbackResourceTypes),
 					List.copyOf(failedIndicators)
 			);
 		}

@@ -11,6 +11,8 @@ public record TourismResourceDemandSyncResponse(
 		int successfulIndicatorCount,
 		int skippedIndicatorCount,
 		List<String> skippedIndicators,
+		List<String> bulkCollectedResourceTypes,
+		List<String> fallbackResourceTypes,
 		List<String> failedIndicators
 ) {
 }
