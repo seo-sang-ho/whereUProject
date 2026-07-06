@@ -33,7 +33,8 @@ public class TourismResourceDemandSyncJobService {
 
 	public synchronized TourismResourceDemandSyncJobResponse start(
 			ResourceDemandType resourceType,
-			String indicatorCode
+			String indicatorCode,
+			boolean force
 	) {
 		validateRequest(resourceType, indicatorCode);
 		if (activeJobId != null) {
@@ -44,7 +45,7 @@ public class TourismResourceDemandSyncJobService {
 		jobs.put(jobId, SyncJob.running(jobId));
 		activeJobId = jobId;
 		try {
-			executor.execute(() -> execute(jobId, resourceType, indicatorCode));
+			executor.execute(() -> execute(jobId, resourceType, indicatorCode, force));
 		} catch (RuntimeException exception) {
 			jobs.remove(jobId);
 			activeJobId = null;
@@ -64,12 +65,13 @@ public class TourismResourceDemandSyncJobService {
 	private void execute(
 			UUID jobId,
 			ResourceDemandType resourceType,
-			String indicatorCode
+			String indicatorCode,
+			boolean force
 	) {
 		try {
 			TourismResourceDemandSyncResponse result = resourceType == null
-					? syncService.sync()
-					: syncService.sync(resourceType, indicatorCode);
+					? syncService.sync(force)
+					: syncService.sync(resourceType, indicatorCode, force);
 			ResourceDemandSyncJobStatus status = result.failedIndicators().isEmpty()
 					? ResourceDemandSyncJobStatus.COMPLETED
 					: ResourceDemandSyncJobStatus.PARTIAL_FAILED;

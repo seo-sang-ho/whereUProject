@@ -28,10 +28,10 @@ class TourismResourceDemandSyncJobServiceTest {
 	@Test
 	void completesFullSyncInBackgroundExecutor() {
 		TourismResourceDemandSyncResponse syncResponse = response(List.of());
-		when(syncService.sync()).thenReturn(syncResponse);
+		when(syncService.sync(false)).thenReturn(syncResponse);
 		TourismResourceDemandSyncJobService jobService = jobService(Runnable::run);
 
-		TourismResourceDemandSyncJobResponse job = jobService.start(null, null);
+		TourismResourceDemandSyncJobResponse job = jobService.start(null, null, false);
 
 		assertThat(job.status()).isEqualTo(ResourceDemandSyncJobStatus.COMPLETED);
 		assertThat(job.result()).isEqualTo(syncResponse);
@@ -43,19 +43,19 @@ class TourismResourceDemandSyncJobServiceTest {
 		AtomicReference<Runnable> pendingTask = new AtomicReference<>();
 		TourismResourceDemandSyncJobService jobService = jobService(pendingTask::set);
 
-		TourismResourceDemandSyncJobResponse runningJob = jobService.start(null, null);
+		TourismResourceDemandSyncJobResponse runningJob = jobService.start(null, null, false);
 
 		assertThat(runningJob.status()).isEqualTo(ResourceDemandSyncJobStatus.RUNNING);
-		assertThatThrownBy(() -> jobService.start(null, null))
+		assertThatThrownBy(() -> jobService.start(null, null, false))
 				.isInstanceOf(ResourceDemandSyncAlreadyRunningException.class);
 	}
 
 	@Test
 	void marksJobAsPartialFailureWhenIndicatorFailed() {
-		when(syncService.sync()).thenReturn(response(List.of("SERVICE:1101")));
+		when(syncService.sync(false)).thenReturn(response(List.of("SERVICE:1101")));
 		TourismResourceDemandSyncJobService jobService = jobService(Runnable::run);
 
-		TourismResourceDemandSyncJobResponse job = jobService.start(null, null);
+		TourismResourceDemandSyncJobResponse job = jobService.start(null, null, false);
 
 		assertThat(job.status()).isEqualTo(ResourceDemandSyncJobStatus.PARTIAL_FAILED);
 		assertThat(job.result().failedIndicators()).containsExactly("SERVICE:1101");
@@ -64,15 +64,15 @@ class TourismResourceDemandSyncJobServiceTest {
 	@Test
 	void runsOnlyRequestedIndicator() {
 		TourismResourceDemandSyncResponse syncResponse = response(List.of());
-		when(syncService.sync(ResourceDemandType.CULTURE, "1205")).thenReturn(syncResponse);
+		when(syncService.sync(ResourceDemandType.CULTURE, "1205", true)).thenReturn(syncResponse);
 		TourismResourceDemandSyncJobService jobService = jobService(Runnable::run);
 
 		TourismResourceDemandSyncJobResponse job = jobService.start(
-				ResourceDemandType.CULTURE, "1205"
+				ResourceDemandType.CULTURE, "1205", true
 		);
 
 		verify(syncService).validateIndicator(ResourceDemandType.CULTURE, "1205");
-		verify(syncService).sync(ResourceDemandType.CULTURE, "1205");
+		verify(syncService).sync(ResourceDemandType.CULTURE, "1205", true);
 		assertThat(job.status()).isEqualTo(ResourceDemandSyncJobStatus.COMPLETED);
 	}
 
@@ -87,6 +87,8 @@ class TourismResourceDemandSyncJobServiceTest {
 				4284,
 				LocalDate.of(2025, 9, 1),
 				17 - failedIndicators.size(),
+				0,
+				List.of(),
 				failedIndicators
 		);
 	}

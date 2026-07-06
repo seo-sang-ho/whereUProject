@@ -34,11 +34,12 @@ public class TourismResourceDemandController {
 	@PostMapping("/sync")
 	public ResponseEntity<ApiResponse<TourismResourceDemandSyncJobResponse>> sync(
 			@RequestParam(required = false) ResourceDemandType resourceType,
-			@RequestParam(required = false) String indicatorCode
+			@RequestParam(required = false) String indicatorCode,
+			@RequestParam(defaultValue = "false") boolean force
 	) {
 		return ResponseEntity
 				.status(HttpStatus.ACCEPTED)
-				.body(ApiResponse.success(syncJobService.start(resourceType, indicatorCode)));
+				.body(ApiResponse.success(syncJobService.start(resourceType, indicatorCode, force)));
 	}
 
 	@GetMapping("/sync/{jobId}")

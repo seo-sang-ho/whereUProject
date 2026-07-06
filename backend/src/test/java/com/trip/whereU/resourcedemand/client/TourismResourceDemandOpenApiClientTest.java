@@ -39,6 +39,20 @@ class TourismResourceDemandOpenApiClientTest {
 	}
 
 	@Test
+	void omitsOptionalIndicatorFilterForBulkCollection() {
+		TourismResourceDemandOpenApiClient client = new TourismResourceDemandOpenApiClient(properties(), null);
+
+		URI uri = client.buildUri(
+				ResourceDemandType.SERVICE, "11", null, 1, 1000, "test-key"
+		);
+
+		assertThat(uri.toString())
+				.contains("areaCd=11")
+				.contains("numOfRows=1000")
+				.doesNotContain("tarSvcDemIxCd");
+	}
+
+	@Test
 	void parsesCulturalAggregateAndDistrictItems() {
 		TourismResourceDemandOpenApiClient client = client();
 		String responseBody = """

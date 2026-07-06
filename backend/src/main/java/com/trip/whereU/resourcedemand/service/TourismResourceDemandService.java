@@ -10,10 +10,14 @@ import com.trip.whereU.resourcedemand.entity.ResourceDemandType;
 import com.trip.whereU.resourcedemand.repository.TourismResourceDemandRepository;
 import com.trip.whereU.servicedemand.config.TourismResourceDemandApiProperties;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,7 +27,8 @@ import org.springframework.web.client.RestClientException;
 public class TourismResourceDemandService {
 
 	private static final int FIRST_PAGE = 1;
-	private static final int PAGE_SIZE = 100;
+	private static final int FILTERED_PAGE_SIZE = 100;
+	private static final int BULK_PAGE_SIZE = 1000;
 	private static final Map<ResourceDemandType, List<String>> INDICATOR_CODES = Map.of(
 			ResourceDemandType.SERVICE,
 			List.of("1101", "1102", "1103", "1104", "1105", "1106", "1107", "1108", "1109", "1110", "1111", "1112"),
@@ -34,36 +39,138 @@ public class TourismResourceDemandService {
 	private final TourismResourceDemandRepository repository;
 	private final TourismResourceDemandOpenApiClient openApiClient;
 	private final TourismResourceDemandPersistenceService persistenceService;
+	private final TourismResourceDemandSyncStateService syncStateService;
 	private final TourismResourceDemandApiProperties properties;
 
 	public TourismResourceDemandService(
 			TourismResourceDemandRepository repository,
 			TourismResourceDemandOpenApiClient openApiClient,
 			TourismResourceDemandPersistenceService persistenceService,
+			TourismResourceDemandSyncStateService syncStateService,
 			TourismResourceDemandApiProperties properties
 	) {
 		this.repository = repository;
 		this.openApiClient = openApiClient;
 		this.persistenceService = persistenceService;
+		this.syncStateService = syncStateService;
 		this.properties = properties;
 	}
 
 	public TourismResourceDemandSyncResponse sync() {
-		return syncIndicators(INDICATOR_CODES);
+		return sync(false);
+	}
+
+	public TourismResourceDemandSyncResponse sync(boolean force) {
+		SyncResult result = new SyncResult();
+		LocalDate referenceDate = configuredReferenceDate();
+		for (ResourceDemandType resourceType : ResourceDemandType.values()) {
+			List<String> pendingIndicatorCodes = pendingIndicatorCodes(
+					resourceType, referenceDate, force, result
+			);
+			if (pendingIndicatorCodes.isEmpty()) {
+				continue;
+			}
+			if (pendingIndicatorCodes.size() < INDICATOR_CODES.get(resourceType).size()) {
+				syncIndicators(Map.of(resourceType, pendingIndicatorCodes), result, referenceDate);
+				continue;
+			}
+			try {
+				syncResourceTypeInBulk(resourceType, result, referenceDate);
+			} catch (BulkCollectionException | RestClientException | IllegalStateException exception) {
+				syncIndicators(
+						Map.of(resourceType, pendingIndicatorCodes), result, referenceDate
+				);
+			}
+		}
+		return result.toResponse();
 	}
 
 	public TourismResourceDemandSyncResponse sync(
 			ResourceDemandType resourceType,
 			String indicatorCode
 	) {
-		validateIndicator(resourceType, indicatorCode);
-		return syncIndicators(Map.of(resourceType, List.of(indicatorCode)));
+		return sync(resourceType, indicatorCode, false);
 	}
 
-	private TourismResourceDemandSyncResponse syncIndicators(
-			Map<ResourceDemandType, List<String>> indicatorsByType
+	public TourismResourceDemandSyncResponse sync(
+			ResourceDemandType resourceType,
+			String indicatorCode,
+			boolean force
 	) {
+		validateIndicator(resourceType, indicatorCode);
 		SyncResult result = new SyncResult();
+		LocalDate referenceDate = configuredReferenceDate();
+		if (!force && syncStateService.isCompleted(resourceType, indicatorCode, referenceDate)) {
+			result.recordSkipped(resourceType, indicatorCode, referenceDate);
+			return result.toResponse();
+		}
+		syncIndicators(Map.of(resourceType, List.of(indicatorCode)), result, referenceDate);
+		return result.toResponse();
+	}
+
+	private List<String> pendingIndicatorCodes(
+			ResourceDemandType resourceType,
+			LocalDate referenceDate,
+			boolean force,
+			SyncResult result
+	) {
+		if (force) {
+			return INDICATOR_CODES.get(resourceType);
+		}
+		List<String> pending = new ArrayList<>();
+		for (String indicatorCode : INDICATOR_CODES.get(resourceType)) {
+			if (syncStateService.isCompleted(resourceType, indicatorCode, referenceDate)) {
+				result.recordSkipped(resourceType, indicatorCode, referenceDate);
+			} else {
+				pending.add(indicatorCode);
+			}
+		}
+		return List.copyOf(pending);
+	}
+
+	private void syncResourceTypeInBulk(
+			ResourceDemandType resourceType,
+			SyncResult result,
+			LocalDate referenceDate
+	) {
+		Set<String> expectedIndicatorCodes = Set.copyOf(INDICATOR_CODES.get(resourceType));
+		List<TourismResourceDemandOpenApiItem> items = fetchAllIndicators(resourceType).stream()
+				.filter(item -> expectedIndicatorCodes.contains(item.indicatorCode()))
+				.toList();
+		Set<String> collectedIndicatorCodes = items.stream()
+				.map(TourismResourceDemandOpenApiItem::indicatorCode)
+				.collect(Collectors.toSet());
+		List<String> missingIndicatorCodes = INDICATOR_CODES.get(resourceType).stream()
+				.filter(code -> !collectedIndicatorCodes.contains(code))
+				.toList();
+		if (!missingIndicatorCodes.isEmpty()) {
+			throw new BulkCollectionException();
+		}
+		result.recordBulkSuccess(
+				resourceType,
+				items,
+				persistenceService.saveItems(items),
+				INDICATOR_CODES.get(resourceType).size()
+		);
+		Map<String, Long> countsByIndicator = items.stream().collect(Collectors.groupingBy(
+				TourismResourceDemandOpenApiItem::indicatorCode,
+				Collectors.counting()
+		));
+		for (String indicatorCode : INDICATOR_CODES.get(resourceType)) {
+			syncStateService.markCompleted(
+					resourceType,
+					indicatorCode,
+					referenceDate,
+					countsByIndicator.getOrDefault(indicatorCode, 0L).intValue()
+			);
+		}
+	}
+
+	private void syncIndicators(
+			Map<ResourceDemandType, List<String>> indicatorsByType,
+			SyncResult result,
+			LocalDate referenceDate
+	) {
 		for (Map.Entry<ResourceDemandType, List<String>> entry : indicatorsByType.entrySet()) {
 			for (String indicatorCode : entry.getValue()) {
 				ResourceDemandType resourceType = entry.getKey();
@@ -76,12 +183,31 @@ public class TourismResourceDemandService {
 							items,
 							persistenceService.saveItems(items)
 					);
+					syncStateService.markCompleted(
+							resourceType, indicatorCode, referenceDate, items.size()
+					);
 				} catch (RestClientException exception) {
 					result.recordFailure(resourceType, indicatorCode);
 				}
 			}
 		}
-		return result.toResponse();
+	}
+
+	private LocalDate configuredReferenceDate() {
+		return YearMonth.parse(
+				properties.serviceDemand().baseYm(),
+				DateTimeFormatter.ofPattern("yyyyMM")
+		).atDay(1);
+	}
+
+	private List<TourismResourceDemandOpenApiItem> fetchAllIndicators(
+			ResourceDemandType resourceType
+	) {
+		List<TourismResourceDemandOpenApiItem> items = new ArrayList<>();
+		for (String areaCode : properties.serviceDemand().areaCodes()) {
+			fetchPages(resourceType, areaCode, null, BULK_PAGE_SIZE, items);
+		}
+		return items;
 	}
 
 	private List<TourismResourceDemandOpenApiItem> fetchIndicator(
@@ -90,19 +216,34 @@ public class TourismResourceDemandService {
 	) {
 		List<TourismResourceDemandOpenApiItem> items = new ArrayList<>();
 		for (String areaCode : properties.serviceDemand().areaCodes()) {
-			int pageNo = FIRST_PAGE;
-			TourismResourceDemandOpenApiPage page;
-			do {
-				page = openApiClient.fetchPage(
-						resourceType, areaCode, indicatorCode, pageNo, PAGE_SIZE
-				);
-				page.items().stream()
-						.filter(item -> !item.isAreaAggregate())
-						.forEach(items::add);
-				pageNo++;
-			} while ((long) (pageNo - 1) * PAGE_SIZE < page.totalCount());
+			fetchPages(resourceType, areaCode, indicatorCode, FILTERED_PAGE_SIZE, items);
 		}
 		return items;
+	}
+
+	private void fetchPages(
+			ResourceDemandType resourceType,
+			String areaCode,
+			String indicatorCode,
+			int requestedPageSize,
+			List<TourismResourceDemandOpenApiItem> target
+	) {
+		int pageNo = FIRST_PAGE;
+		TourismResourceDemandOpenApiPage page;
+		do {
+			page = openApiClient.fetchPage(
+					resourceType, areaCode, indicatorCode, pageNo, requestedPageSize
+			);
+			page.items().stream()
+					.filter(item -> !item.isAreaAggregate())
+					.forEach(target::add);
+			pageNo++;
+		} while (hasNextPage(pageNo, page));
+	}
+
+	private boolean hasNextPage(int nextPageNo, TourismResourceDemandOpenApiPage page) {
+		int effectivePageSize = page.numOfRows() > 0 ? page.numOfRows() : BULK_PAGE_SIZE;
+		return (long) (nextPageNo - 1) * effectivePageSize < page.totalCount();
 	}
 
 	void validateIndicator(ResourceDemandType resourceType, String indicatorCode) {
@@ -134,6 +275,7 @@ public class TourismResourceDemandService {
 		private int savedCount;
 		private int successfulIndicatorCount;
 		private LocalDate referenceDate;
+		private final List<String> skippedIndicators = new ArrayList<>();
 		private final List<String> failedIndicators = new ArrayList<>();
 
 		private void recordSuccess(
@@ -155,8 +297,43 @@ public class TourismResourceDemandService {
 					.ifPresent(date -> referenceDate = date);
 		}
 
+		private void recordBulkSuccess(
+				ResourceDemandType resourceType,
+				List<TourismResourceDemandOpenApiItem> items,
+				int savedItems,
+				int indicatorCount
+		) {
+			if (resourceType == ResourceDemandType.SERVICE) {
+				serviceCollectedCount += items.size();
+			} else {
+				culturalCollectedCount += items.size();
+			}
+			savedCount += savedItems;
+			successfulIndicatorCount += indicatorCount;
+			updateReferenceDate(items);
+		}
+
+		private void updateReferenceDate(List<TourismResourceDemandOpenApiItem> items) {
+			items.stream()
+					.map(TourismResourceDemandOpenApiItem::referenceDate)
+					.max(LocalDate::compareTo)
+					.filter(date -> referenceDate == null || date.isAfter(referenceDate))
+					.ifPresent(date -> referenceDate = date);
+		}
+
 		private void recordFailure(ResourceDemandType resourceType, String indicatorCode) {
 			failedIndicators.add(resourceType.name() + ":" + indicatorCode);
+		}
+
+		private void recordSkipped(
+				ResourceDemandType resourceType,
+				String indicatorCode,
+				LocalDate skippedReferenceDate
+		) {
+			skippedIndicators.add(resourceType.name() + ":" + indicatorCode);
+			if (referenceDate == null || skippedReferenceDate.isAfter(referenceDate)) {
+				referenceDate = skippedReferenceDate;
+			}
 		}
 
 		private TourismResourceDemandSyncResponse toResponse() {
@@ -166,8 +343,13 @@ public class TourismResourceDemandService {
 					savedCount,
 					referenceDate,
 					successfulIndicatorCount,
+					skippedIndicators.size(),
+					List.copyOf(skippedIndicators),
 					List.copyOf(failedIndicators)
 			);
 		}
+	}
+
+	private static class BulkCollectionException extends RuntimeException {
 	}
 }

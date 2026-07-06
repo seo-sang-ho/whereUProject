@@ -9,6 +9,8 @@ public record TourismResourceDemandSyncResponse(
 		int savedCount,
 		LocalDate referenceDate,
 		int successfulIndicatorCount,
+		int skippedIndicatorCount,
+		List<String> skippedIndicators,
 		List<String> failedIndicators
 ) {
 }

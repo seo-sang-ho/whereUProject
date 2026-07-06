@@ -91,16 +91,18 @@ public class TourismResourceDemandOpenApiClient {
 			int numOfRows,
 			String serviceKey
 	) {
-		String encodedQuery = UriComponentsBuilder
-				.newInstance()
+		UriComponentsBuilder queryBuilder = UriComponentsBuilder.newInstance()
 				.queryParam("pageNo", pageNo)
 				.queryParam("numOfRows", numOfRows)
 				.queryParam("MobileOS", properties.mobileOs())
 				.queryParam("MobileApp", properties.mobileApp())
 				.queryParam("baseYm", properties.serviceDemand().baseYm())
 				.queryParam("areaCd", areaCode)
-				.queryParam(indicatorParameter(resourceType), indicatorCode)
-				.queryParam("_type", "json")
+				.queryParam("_type", "json");
+		if (StringUtils.hasText(indicatorCode)) {
+			queryBuilder.queryParam(indicatorParameter(resourceType), indicatorCode);
+		}
+		String encodedQuery = queryBuilder
 				.build()
 				.encode()
 				.toUri()
