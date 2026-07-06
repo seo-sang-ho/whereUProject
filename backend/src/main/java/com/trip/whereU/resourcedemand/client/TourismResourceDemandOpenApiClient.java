@@ -5,6 +5,8 @@ import com.trip.whereU.resourcedemand.dto.TourismResourceDemandOpenApiPage;
 import com.trip.whereU.resourcedemand.entity.ResourceDemandType;
 import com.trip.whereU.servicedemand.config.TourismResourceDemandApiProperties;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -13,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -35,7 +38,12 @@ public class TourismResourceDemandOpenApiClient {
 	) {
 		this.properties = properties;
 		this.objectMapper = objectMapper;
-		this.restClient = RestClient.create();
+		HttpClient httpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(5))
+				.build();
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+		requestFactory.setReadTimeout(Duration.ofSeconds(20));
+		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
 	}
 
 	public TourismResourceDemandOpenApiPage fetchPage(
@@ -91,18 +99,15 @@ public class TourismResourceDemandOpenApiClient {
 			int numOfRows,
 			String serviceKey
 	) {
-		UriComponentsBuilder queryBuilder = UriComponentsBuilder.newInstance()
+		String encodedQuery = UriComponentsBuilder.newInstance()
 				.queryParam("pageNo", pageNo)
 				.queryParam("numOfRows", numOfRows)
 				.queryParam("MobileOS", properties.mobileOs())
 				.queryParam("MobileApp", properties.mobileApp())
 				.queryParam("baseYm", properties.serviceDemand().baseYm())
 				.queryParam("areaCd", areaCode)
-				.queryParam("_type", "json");
-		if (StringUtils.hasText(indicatorCode)) {
-			queryBuilder.queryParam(indicatorParameter(resourceType), indicatorCode);
-		}
-		String encodedQuery = queryBuilder
+				.queryParam(indicatorParameter(resourceType), indicatorCode)
+				.queryParam("_type", "json")
 				.build()
 				.encode()
 				.toUri()

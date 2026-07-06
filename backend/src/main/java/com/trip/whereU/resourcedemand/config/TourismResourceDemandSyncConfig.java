@@ -18,4 +18,15 @@ public class TourismResourceDemandSyncConfig {
 		executor.initialize();
 		return executor;
 	}
+
+	@Bean(name = "resourceDemandFetchExecutor")
+	public Executor resourceDemandFetchExecutor() {
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(4);
+		executor.setMaxPoolSize(4);
+		executor.setQueueCapacity(20);
+		executor.setThreadNamePrefix("resource-demand-fetch-");
+		executor.initialize();
+		return executor;
+	}
 }

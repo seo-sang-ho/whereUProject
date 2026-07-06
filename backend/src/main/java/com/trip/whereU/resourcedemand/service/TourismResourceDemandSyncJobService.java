@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class TourismResourceDemandSyncJobService {
 
 	private static final String FAILED_MESSAGE = "동기화 작업 중 오류가 발생했습니다.";
+	private static final int FULL_SYNC_INDICATOR_COUNT = 17;
 
 	private final TourismResourceDemandService syncService;
 	private final Executor executor;
@@ -42,7 +43,8 @@ public class TourismResourceDemandSyncJobService {
 		}
 
 		UUID jobId = UUID.randomUUID();
-		jobs.put(jobId, SyncJob.running(jobId));
+		int totalIndicatorCount = resourceType == null ? FULL_SYNC_INDICATOR_COUNT : 1;
+		jobs.put(jobId, SyncJob.running(jobId, totalIndicatorCount));
 		activeJobId = jobId;
 		try {
 			executor.execute(() -> execute(jobId, resourceType, indicatorCode, force));
@@ -70,8 +72,13 @@ public class TourismResourceDemandSyncJobService {
 	) {
 		try {
 			TourismResourceDemandSyncResponse result = resourceType == null
-					? syncService.sync(force)
-					: syncService.sync(resourceType, indicatorCode, force);
+					? syncService.sync(force, (processed, total) -> updateProgress(jobId, processed))
+					: syncService.sync(
+							resourceType,
+							indicatorCode,
+							force,
+							(processed, total) -> updateProgress(jobId, processed)
+					);
 			ResourceDemandSyncJobStatus status = result.failedIndicators().isEmpty()
 					? ResourceDemandSyncJobStatus.COMPLETED
 					: ResourceDemandSyncJobStatus.PARTIAL_FAILED;
@@ -81,6 +88,13 @@ public class TourismResourceDemandSyncJobService {
 		} finally {
 			release(jobId);
 		}
+	}
+
+	private void updateProgress(UUID jobId, int processedIndicatorCount) {
+		jobs.computeIfPresent(
+				jobId,
+				(id, job) -> job.updateProgress(processedIndicatorCount)
+		);
 	}
 
 	private void validateRequest(ResourceDemandType resourceType, String indicatorCode) {
@@ -99,19 +113,36 @@ public class TourismResourceDemandSyncJobService {
 	private record SyncJob(
 			UUID jobId,
 			ResourceDemandSyncJobStatus status,
+			int processedIndicatorCount,
+			int totalIndicatorCount,
 			LocalDateTime startedAt,
 			LocalDateTime completedAt,
 			TourismResourceDemandSyncResponse result,
 			String errorMessage
 	) {
-		private static SyncJob running(UUID jobId) {
+		private static SyncJob running(UUID jobId, int totalIndicatorCount) {
 			return new SyncJob(
 					jobId,
 					ResourceDemandSyncJobStatus.RUNNING,
+					0,
+					totalIndicatorCount,
 					LocalDateTime.now(),
 					null,
 					null,
 					null
+			);
+		}
+
+		private SyncJob updateProgress(int processedCount) {
+			return new SyncJob(
+					jobId,
+					status,
+					processedCount,
+					totalIndicatorCount,
+					startedAt,
+					completedAt,
+					result,
+					errorMessage
 			);
 		}
 
@@ -122,6 +153,8 @@ public class TourismResourceDemandSyncJobService {
 			return new SyncJob(
 					jobId,
 					completedStatus,
+					totalIndicatorCount,
+					totalIndicatorCount,
 					startedAt,
 					LocalDateTime.now(),
 					syncResult,
@@ -133,6 +166,8 @@ public class TourismResourceDemandSyncJobService {
 			return new SyncJob(
 					jobId,
 					ResourceDemandSyncJobStatus.FAILED,
+					processedIndicatorCount,
+					totalIndicatorCount,
 					startedAt,
 					LocalDateTime.now(),
 					null,
@@ -144,6 +179,8 @@ public class TourismResourceDemandSyncJobService {
 			return new TourismResourceDemandSyncJobResponse(
 					jobId,
 					status,
+					processedIndicatorCount,
+					totalIndicatorCount,
 					startedAt,
 					completedAt,
 					result,

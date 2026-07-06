@@ -7,6 +7,8 @@ import java.util.UUID;
 public record TourismResourceDemandSyncJobResponse(
 		UUID jobId,
 		ResourceDemandSyncJobStatus status,
+		int processedIndicatorCount,
+		int totalIndicatorCount,
 		LocalDateTime startedAt,
 		LocalDateTime completedAt,
 		TourismResourceDemandSyncResponse result,
