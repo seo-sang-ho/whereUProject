@@ -26,13 +26,26 @@ public class TourismContentController {
 
 	@PostMapping("/sync")
 	public ResponseEntity<ApiResponse<TourismContentSyncResponse>> sync(
-			@RequestParam(required = false) String areaCode,
-			@RequestParam(required = false) String sigunguCode,
 			@RequestParam(required = false) String contentTypeId,
+			@RequestParam(defaultValue = "C") String arrange,
+			@RequestParam(required = false) String lDongRegnCd,
+			@RequestParam(required = false) String lDongSignguCd,
+			@RequestParam(required = false) String lclsSystm1,
+			@RequestParam(required = false) String lclsSystm2,
+			@RequestParam(required = false) String lclsSystm3,
 			@RequestParam(defaultValue = "100") int pageSize
 	) {
 		return ResponseEntity.ok(ApiResponse.success(
-				service.sync(areaCode, sigunguCode, contentTypeId, pageSize)
+				service.sync(
+						contentTypeId,
+						arrange,
+						lDongRegnCd,
+						lDongSignguCd,
+						lclsSystm1,
+						lclsSystm2,
+						lclsSystm3,
+						pageSize
+				)
 		));
 	}
 

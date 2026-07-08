@@ -38,9 +38,13 @@ public class TourismContentService {
 	}
 
 	public TourismContentSyncResponse sync(
-			String areaCode,
-			String sigunguCode,
 			String contentTypeId,
+			String arrange,
+			String legalDongRegionCode,
+			String legalDongSigunguCode,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
 			int pageSize
 	) {
 		validatePageSize(pageSize);
@@ -48,7 +52,17 @@ public class TourismContentService {
 		int pageNo = FIRST_PAGE;
 		TourismContentOpenApiPage page;
 		do {
-			page = openApiClient.fetchAreaBasedPage(areaCode, sigunguCode, contentTypeId, pageNo, pageSize);
+			page = openApiClient.fetchAreaBasedPage(
+					contentTypeId,
+					arrange,
+					legalDongRegionCode,
+					legalDongSigunguCode,
+					categoryLevel1,
+					categoryLevel2,
+					categoryLevel3,
+					pageNo,
+					pageSize
+			);
 			items.addAll(page.items());
 			pageNo++;
 		} while ((long) (pageNo - 1) * pageSize < page.totalCount());

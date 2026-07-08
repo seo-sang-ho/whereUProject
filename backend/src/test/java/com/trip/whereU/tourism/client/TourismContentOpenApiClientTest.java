@@ -15,15 +15,30 @@ class TourismContentOpenApiClientTest {
 	void keepsEncodedServiceKeyAndBuildsAreaBasedListParameters() {
 		TourismContentOpenApiClient client = new TourismContentOpenApiClient(properties(), null);
 
-		URI uri = client.buildUri("11", "11110", "12", 1, 100, "Gfs%2Babc%2Fdef%3D%3D");
+		URI uri = client.buildUri(
+				"12",
+				"C",
+				"26",
+				"380",
+				"NA",
+				"NA04",
+				"NA040500",
+				1,
+				100,
+				"Gfs%2Babc%2Fdef%3D%3D"
+		);
 
 		assertThat(uri.toString())
 				.contains("/areaBasedList2?serviceKey=Gfs%2Babc%2Fdef%3D%3D&")
 				.contains("MobileOS=ETC")
 				.contains("MobileApp=whereU")
-				.contains("areaCode=11")
-				.contains("sigunguCode=11110")
 				.contains("contentTypeId=12")
+				.contains("arrange=C")
+				.contains("lDongRegnCd=26")
+				.contains("lDongSignguCd=380")
+				.contains("lclsSystm1=NA")
+				.contains("lclsSystm2=NA04")
+				.contains("lclsSystm3=NA040500")
 				.contains("_type=json")
 				.doesNotContain("%252B");
 	}

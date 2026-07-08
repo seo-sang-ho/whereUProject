@@ -36,13 +36,22 @@ class TourismContentServiceTest {
 
 	@Test
 	void syncFetchesAllPagesAndSavesItems() {
-		when(openApiClient.fetchAreaBasedPage("11", "11110", "12", 1, 2))
+		when(openApiClient.fetchAreaBasedPage("12", "C", "26", "380", "NA", "NA04", "NA040500", 1, 2))
 				.thenReturn(new TourismContentOpenApiPage(List.of(item("1"), item("2")), 1, 2, 3));
-		when(openApiClient.fetchAreaBasedPage("11", "11110", "12", 2, 2))
+		when(openApiClient.fetchAreaBasedPage("12", "C", "26", "380", "NA", "NA04", "NA040500", 2, 2))
 				.thenReturn(new TourismContentOpenApiPage(List.of(item("3")), 2, 2, 3));
 		when(persistenceService.saveItems(any())).thenReturn(3);
 
-		TourismContentSyncResponse response = service().sync("11", "11110", "12", 2);
+		TourismContentSyncResponse response = service().sync(
+				"12",
+				"C",
+				"26",
+				"380",
+				"NA",
+				"NA04",
+				"NA040500",
+				2
+		);
 
 		assertThat(response.fetchedCount()).isEqualTo(3);
 		assertThat(response.savedCount()).isEqualTo(3);
@@ -76,7 +85,7 @@ class TourismContentServiceTest {
 
 	@Test
 	void rejectsInvalidPageSize() {
-		assertThatThrownBy(() -> service().sync("11", null, null, 0))
+		assertThatThrownBy(() -> service().sync(null, null, null, null, null, null, null, 0))
 				.isInstanceOf(IllegalArgumentException.class)
 				.hasMessage("pageSize는 1 이상 1000 이하로 입력하세요.");
 	}

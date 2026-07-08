@@ -31,14 +31,29 @@ public class TourismContentOpenApiClient {
 	}
 
 	public TourismContentOpenApiPage fetchAreaBasedPage(
-			String areaCode,
-			String sigunguCode,
 			String contentTypeId,
+			String arrange,
+			String legalDongRegionCode,
+			String legalDongSigunguCode,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
 			int pageNo,
 			int numOfRows
 	) {
 		validateProperties();
-		URI uri = buildUri(areaCode, sigunguCode, contentTypeId, pageNo, numOfRows, properties.serviceKey());
+		URI uri = buildUri(
+				contentTypeId,
+				arrange,
+				legalDongRegionCode,
+				legalDongSigunguCode,
+				categoryLevel1,
+				categoryLevel2,
+				categoryLevel3,
+				pageNo,
+				numOfRows,
+				properties.serviceKey()
+		);
 		String responseBody = restClient.get()
 				.uri(uri)
 				.retrieve()
@@ -47,9 +62,13 @@ public class TourismContentOpenApiClient {
 	}
 
 	URI buildUri(
-			String areaCode,
-			String sigunguCode,
 			String contentTypeId,
+			String arrange,
+			String legalDongRegionCode,
+			String legalDongSigunguCode,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
 			int pageNo,
 			int numOfRows,
 			String serviceKey
@@ -60,9 +79,13 @@ public class TourismContentOpenApiClient {
 				.queryParam("MobileOS", properties.mobileOs())
 				.queryParam("MobileApp", properties.mobileApp())
 				.queryParam("_type", "json");
-		addTextQueryParam(queryBuilder, "areaCode", areaCode);
-		addTextQueryParam(queryBuilder, "sigunguCode", sigunguCode);
 		addTextQueryParam(queryBuilder, "contentTypeId", contentTypeId);
+		addTextQueryParam(queryBuilder, "arrange", arrange);
+		addTextQueryParam(queryBuilder, "lDongRegnCd", legalDongRegionCode);
+		addTextQueryParam(queryBuilder, "lDongSignguCd", legalDongSigunguCode);
+		addTextQueryParam(queryBuilder, "lclsSystm1", categoryLevel1);
+		addTextQueryParam(queryBuilder, "lclsSystm2", categoryLevel2);
+		addTextQueryParam(queryBuilder, "lclsSystm3", categoryLevel3);
 
 		String encodedQuery = queryBuilder
 				.build()
