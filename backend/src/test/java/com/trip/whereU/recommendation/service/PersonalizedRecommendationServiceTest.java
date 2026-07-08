@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import com.trip.whereU.map.entity.TourismRegion;
 import com.trip.whereU.map.repository.TourismRegionRepository;
 import com.trip.whereU.recommendation.dto.PersonalizedRecommendationResponse;
+import com.trip.whereU.recommendation.dto.RecommendedTourismContentResponse;
 import com.trip.whereU.resourcedemand.entity.ResourceDemandType;
 import com.trip.whereU.resourcedemand.entity.TourismResourceDemand;
 import com.trip.whereU.resourcedemand.entity.TourismTheme;
@@ -29,6 +30,8 @@ class PersonalizedRecommendationServiceTest {
 	private TourismStayStrengthRepository stayStrengthRepository;
 	@Mock
 	private TourismRegionRepository regionRepository;
+	@Mock
+	private RecommendationTourismContentService recommendationTourismContentService;
 
 	@Test
 	void givesSelectedThemesEqualWeightAndRanksLowStayStrengthFirst() {
@@ -58,6 +61,13 @@ class PersonalizedRecommendationServiceTest {
 				new TourismRegion("11-11110", "종로구", 37.57, 126.98),
 				new TourismRegion("11-11140", "중구", 37.56, 126.99)
 		));
+		when(recommendationTourismContentService.findContentsByRegionCodes(
+				List.of("11-11110", "11-11140"),
+				3
+		)).thenReturn(java.util.Map.of(
+				"11-11110",
+				List.of(tourismContent("127974", "을숙도 공원"))
+		));
 
 		PersonalizedRecommendationResponse response = service().getLatestRecommendations(
 				List.of(TourismTheme.FOOD, TourismTheme.NATURE, TourismTheme.FOOD),
@@ -73,6 +83,9 @@ class PersonalizedRecommendationServiceTest {
 		assertThat(response.recommendations().getFirst().recommendationScore()).isEqualTo(0.695);
 		assertThat(response.recommendations().getFirst().recommendationScorePercent()).isEqualTo(70);
 		assertThat(response.recommendations().getFirst().themeScores()).hasSize(2);
+		assertThat(response.recommendations().getFirst().tourismContents())
+				.extracting(RecommendedTourismContentResponse::title)
+				.containsExactly("을숙도 공원");
 	}
 
 	@Test
@@ -134,7 +147,23 @@ class PersonalizedRecommendationServiceTest {
 		return new PersonalizedRecommendationService(
 				resourceDemandRepository,
 				stayStrengthRepository,
-				regionRepository
+				regionRepository,
+				recommendationTourismContentService
+		);
+	}
+
+	private RecommendedTourismContentResponse tourismContent(String contentId, String title) {
+		return new RecommendedTourismContentResponse(
+				contentId,
+				"12",
+				title,
+				"부산광역시 사하구",
+				"https://example.com/image.jpg",
+				"https://example.com/thumb.jpg",
+				35.1,
+				128.9,
+				"26-380",
+				"NA040500"
 		);
 	}
 

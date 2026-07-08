@@ -14,6 +14,7 @@ public record PersonalizedRecommendationItemResponse(
 		String interpretation,
 		List<ThemeScoreResponse> themeScores,
 		Double latitude,
-		Double longitude
+		Double longitude,
+		List<RecommendedTourismContentResponse> tourismContents
 ) {
 }

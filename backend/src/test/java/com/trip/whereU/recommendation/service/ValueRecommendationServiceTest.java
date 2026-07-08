@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.trip.whereU.map.entity.TourismRegion;
 import com.trip.whereU.map.repository.TourismRegionRepository;
+import com.trip.whereU.recommendation.dto.RecommendedTourismContentResponse;
 import com.trip.whereU.recommendation.dto.ValueRecommendationResponse;
 import com.trip.whereU.servicedemand.entity.TourismServiceDemand;
 import com.trip.whereU.servicedemand.repository.TourismServiceDemandRepository;
@@ -27,6 +28,8 @@ class ValueRecommendationServiceTest {
 	private TourismStayStrengthRepository stayStrengthRepository;
 	@Mock
 	private TourismRegionRepository regionRepository;
+	@Mock
+	private RecommendationTourismContentService recommendationTourismContentService;
 
 	@Test
 	void ranksHighServiceDemandAndLowStayStrengthFirstUsingLatestCommonMonth() {
@@ -47,6 +50,13 @@ class ValueRecommendationServiceTest {
 				new TourismRegion("11-11110", "종로구", 37.57, 126.98),
 				new TourismRegion("11-11140", "중구", 37.56, 126.99)
 		));
+		when(recommendationTourismContentService.findContentsByRegionCodes(
+				List.of("11-11110", "11-11140"),
+				3
+		)).thenReturn(java.util.Map.of(
+				"11-11110",
+				List.of(tourismContent("127974", "을숙도 공원"))
+		));
 
 		ValueRecommendationResponse response = service().getLatestValueRecommendations(10);
 
@@ -57,6 +67,9 @@ class ValueRecommendationServiceTest {
 		assertThat(response.recommendations().getFirst().recommendationScore()).isEqualTo(0.87);
 		assertThat(response.recommendations().getFirst().recommendationScorePercent()).isEqualTo(87);
 		assertThat(response.recommendations().getFirst().rank()).isEqualTo(1);
+		assertThat(response.recommendations().getFirst().tourismContents())
+				.extracting(RecommendedTourismContentResponse::title)
+				.containsExactly("을숙도 공원");
 	}
 
 	@Test
@@ -97,7 +110,23 @@ class ValueRecommendationServiceTest {
 		return new ValueRecommendationService(
 				serviceDemandRepository,
 				stayStrengthRepository,
-				regionRepository
+				regionRepository,
+				recommendationTourismContentService
+		);
+	}
+
+	private RecommendedTourismContentResponse tourismContent(String contentId, String title) {
+		return new RecommendedTourismContentResponse(
+				contentId,
+				"12",
+				title,
+				"부산광역시 사하구",
+				"https://example.com/image.jpg",
+				"https://example.com/thumb.jpg",
+				35.1,
+				128.9,
+				"26-380",
+				"NA040500"
 		);
 	}
 

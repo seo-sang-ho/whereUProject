@@ -4,6 +4,7 @@ import com.trip.whereU.map.entity.TourismRegion;
 import com.trip.whereU.map.repository.TourismRegionRepository;
 import com.trip.whereU.recommendation.dto.PersonalizedRecommendationItemResponse;
 import com.trip.whereU.recommendation.dto.PersonalizedRecommendationResponse;
+import com.trip.whereU.recommendation.dto.RecommendedTourismContentResponse;
 import com.trip.whereU.recommendation.dto.ThemeScoreResponse;
 import com.trip.whereU.resourcedemand.entity.TourismResourceDemand;
 import com.trip.whereU.resourcedemand.entity.TourismTheme;
@@ -31,20 +32,24 @@ public class PersonalizedRecommendationService {
 
 	private static final double THEME_DEMAND_WEIGHT = 0.7;
 	private static final double LOW_STAY_STRENGTH_WEIGHT = 0.3;
+	private static final int TOURISM_CONTENT_LIMIT_PER_REGION = 3;
 	private static final int MAX_LIMIT = 100;
 
 	private final TourismResourceDemandRepository resourceDemandRepository;
 	private final TourismStayStrengthRepository stayStrengthRepository;
 	private final TourismRegionRepository regionRepository;
+	private final RecommendationTourismContentService recommendationTourismContentService;
 
 	public PersonalizedRecommendationService(
 			TourismResourceDemandRepository resourceDemandRepository,
 			TourismStayStrengthRepository stayStrengthRepository,
-			TourismRegionRepository regionRepository
+			TourismRegionRepository regionRepository,
+			RecommendationTourismContentService recommendationTourismContentService
 	) {
 		this.resourceDemandRepository = resourceDemandRepository;
 		this.stayStrengthRepository = stayStrengthRepository;
 		this.regionRepository = regionRepository;
+		this.recommendationTourismContentService = recommendationTourismContentService;
 	}
 
 	@Transactional(readOnly = true)
@@ -86,10 +91,23 @@ public class PersonalizedRecommendationService {
 						.thenComparing(candidate -> candidate.demand().regionCode()))
 				.limit(limit)
 				.toList();
+		List<String> regionCodes = candidates.stream()
+				.map(candidate -> candidate.demand().regionCode())
+				.toList();
+		Map<String, List<RecommendedTourismContentResponse>> tourismContentsByRegion =
+				recommendationTourismContentService.findContentsByRegionCodes(
+						regionCodes,
+						TOURISM_CONTENT_LIMIT_PER_REGION
+				);
 
 		List<PersonalizedRecommendationItemResponse> recommendations = java.util.stream.IntStream
 				.range(0, candidates.size())
-				.mapToObj(index -> toResponse(index + 1, candidates.get(index), themes))
+				.mapToObj(index -> toResponse(
+						index + 1,
+						candidates.get(index),
+						themes,
+						tourismContentsByRegion
+				))
 				.toList();
 		return PersonalizedRecommendationResponse.of(referenceDate, themes, recommendations);
 	}
@@ -144,9 +162,12 @@ public class PersonalizedRecommendationService {
 	private PersonalizedRecommendationItemResponse toResponse(
 			int rank,
 			RecommendationCandidate candidate,
-			List<TourismTheme> themes
+			List<TourismTheme> themes,
+			Map<String, List<RecommendedTourismContentResponse>> tourismContentsByRegion
 	) {
 		TourismRegion region = candidate.region();
+		List<RecommendedTourismContentResponse> tourismContents = tourismContentsByRegion
+				.getOrDefault(candidate.demand().regionCode(), List.of());
 		return new PersonalizedRecommendationItemResponse(
 				rank,
 				candidate.demand().regionCode(),
@@ -159,7 +180,8 @@ public class PersonalizedRecommendationService {
 				interpret(candidate.score(), themes),
 				candidate.demand().toThemeScores(themes),
 				region == null ? null : region.getLatitude(),
-				region == null ? null : region.getLongitude()
+				region == null ? null : region.getLongitude(),
+				tourismContents
 		);
 	}
 

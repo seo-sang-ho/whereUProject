@@ -1,5 +1,7 @@
 package com.trip.whereU.recommendation.dto;
 
+import java.util.List;
+
 public record ValueRecommendationItemResponse(
 		int rank,
 		String regionCode,
@@ -12,6 +14,7 @@ public record ValueRecommendationItemResponse(
 		int recommendationScorePercent,
 		String interpretation,
 		Double latitude,
-		Double longitude
+		Double longitude,
+		List<RecommendedTourismContentResponse> tourismContents
 ) {
 }

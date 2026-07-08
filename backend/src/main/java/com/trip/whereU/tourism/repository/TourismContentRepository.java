@@ -13,4 +13,6 @@ public interface TourismContentRepository
 	Optional<TourismContent> findByContentId(String contentId);
 
 	List<TourismContent> findByContentIdIn(Collection<String> contentIds);
+
+	List<TourismContent> findByLegalDongCodeIn(Collection<String> legalDongCodes);
 }
