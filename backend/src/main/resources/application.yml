@@ -24,6 +24,12 @@ tourism:
       base-ym: ${TOURISM_SERVICE_DEMAND_BASE_YM:${TOURISM_STAY_STRENGTH_BASE_YM:${TOURISM_DEMAND_BASE_YM:202509}}}
       area-codes: ${TOURISM_SERVICE_DEMAND_AREA_CODES:11,26,27,28,29,30,31,36,41,43,44,46,47,48,50,51,52}
       indicator-code: ${TOURISM_SERVICE_DEMAND_INDICATOR_CODE:11}
+  content-api:
+    base-url: ${TOURISM_CONTENT_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    area-based-list-endpoint: ${TOURISM_CONTENT_AREA_BASED_LIST_ENDPOINT:/areaBasedList2}
+    service-key: ${TOURISM_CONTENT_API_SERVICE_KEY:${TOURISM_OPEN_API_SERVICE_KEY:}}
+    mobile-os: ETC
+    mobile-app: whereU
 
 naver:
   maps:
