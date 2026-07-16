@@ -28,6 +28,7 @@ tourism:
     base-url: ${TOURISM_CONTENT_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
     area-based-list-endpoint: ${TOURISM_CONTENT_AREA_BASED_LIST_ENDPOINT:/areaBasedList2}
     service-key: ${TOURISM_CONTENT_API_SERVICE_KEY:${TOURISM_OPEN_API_SERVICE_KEY:}}
+    admin-token: ${TOURISM_CONTENT_ADMIN_TOKEN:}
     mobile-os: ETC
     mobile-app: whereU
 

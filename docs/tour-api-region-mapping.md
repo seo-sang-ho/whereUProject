@@ -77,3 +77,27 @@ curl "http://localhost:8080/api/recommendations/value?limit=10"
 ```
 
 응답의 각 추천 item에서 `tourismContents[0].firstImage`, `title`, `address`가 채워지는지 확인한다.
+
+## 추천 TOP 지역 자동 수집
+
+가성비 추천 TOP 10 지역의 관광정보를 한 번에 수집하려면 관리자 API를 호출한다.
+
+```bash
+curl -X POST "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-top?limit=10&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+운영 환경에서 `TOURISM_CONTENT_ADMIN_TOKEN`을 설정한 경우 `X-Admin-Token` 헤더를 함께 보낸다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-top?limit=10&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+특정 신분류체계 관광지만 수집하려면 분류 조건을 추가한다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-top?limit=10&pageSize=10&contentTypeId=12&arrange=C&lclsSystm1=NA&lclsSystm2=NA04&lclsSystm3=NA040500"
+```
