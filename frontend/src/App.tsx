@@ -432,6 +432,7 @@ function App() {
               <ol className="recommendation-list" aria-label="가성비 여행지 추천 순위">
                 {recommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
+                  const primaryTourismContent = recommendation.tourismContents[0]
                   return (
                     <li key={recommendation.regionCode}>
                       <button
@@ -449,6 +450,25 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
+                        {primaryTourismContent && (
+                          <span className="tourism-card-preview">
+                            {primaryTourismContent.firstImage ? (
+                              <img
+                                src={primaryTourismContent.firstImage}
+                                alt=""
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span className="tourism-card-placeholder">
+                                {primaryTourismContent.title.slice(0, 1)}
+                              </span>
+                            )}
+                            <span className="tourism-card-copy">
+                              <strong>{primaryTourismContent.title}</strong>
+                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
+                            </span>
+                          </span>
+                        )}
                         {selected && (
                           <span className="recommendation-metrics">
                             <span>서비스 수요 <b>{Math.round(recommendation.normalizedServiceDemand * 100)}</b></span>
@@ -495,6 +515,7 @@ function App() {
               <ol className="recommendation-list" aria-label="개인 맞춤 여행지 추천 순위">
                 {personalizedRecommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
+                  const primaryTourismContent = recommendation.tourismContents[0]
                   return (
                     <li key={recommendation.regionCode}>
                       <button
@@ -512,6 +533,25 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
+                        {primaryTourismContent && (
+                          <span className="tourism-card-preview">
+                            {primaryTourismContent.firstImage ? (
+                              <img
+                                src={primaryTourismContent.firstImage}
+                                alt=""
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span className="tourism-card-placeholder">
+                                {primaryTourismContent.title.slice(0, 1)}
+                              </span>
+                            )}
+                            <span className="tourism-card-copy">
+                              <strong>{primaryTourismContent.title}</strong>
+                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
+                            </span>
+                          </span>
+                        )}
                         {selected && (
                           <span className="personalized-detail">
                             <span className="recommendation-metrics">

@@ -1,4 +1,5 @@
 import type { ApiResponse } from './stayStrength'
+import type { RecommendedTourismContent } from './tourismContent'
 
 export interface ValueRecommendation {
   rank: number
@@ -13,6 +14,7 @@ export interface ValueRecommendation {
   interpretation: string
   latitude: number | null
   longitude: number | null
+  tourismContents: RecommendedTourismContent[]
 }
 
 export interface ValueRecommendationResponse {

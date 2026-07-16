@@ -1,4 +1,5 @@
 import type { ApiResponse } from './stayStrength'
+import type { RecommendedTourismContent } from './tourismContent'
 
 export type TourismTheme =
   | 'NATURE'
@@ -33,6 +34,7 @@ export interface PersonalizedRecommendation {
   themeScores: ThemeScore[]
   latitude: number | null
   longitude: number | null
+  tourismContents: RecommendedTourismContent[]
 }
 
 export interface PersonalizedRecommendationResponse {
