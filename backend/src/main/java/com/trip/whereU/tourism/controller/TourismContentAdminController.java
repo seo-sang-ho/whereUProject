@@ -92,6 +92,37 @@ public class TourismContentAdminController {
 		));
 	}
 
+	@PostMapping("/sync/recommendation-candidates")
+	public ResponseEntity<ApiResponse<TourismContentRecommendationTopSyncResponse>> syncRecommendationCandidateRegions(
+			@RequestHeader(value = "X-Admin-Token", required = false) String requestAdminToken,
+			@RequestParam(required = false) List<TourismTheme> themes,
+			@RequestParam(defaultValue = "100") int limit,
+			@RequestParam(defaultValue = "10") int pageSize,
+			@RequestParam(required = false) String contentTypeId,
+			@RequestParam(defaultValue = "C") String arrange,
+			@RequestParam(required = false) String lclsSystm1,
+			@RequestParam(required = false) String lclsSystm2,
+			@RequestParam(required = false) String lclsSystm3
+	) {
+		if (!isAuthorized(requestAdminToken)) {
+			return ResponseEntity
+					.status(HttpStatus.FORBIDDEN)
+					.body(ApiResponse.failure("관리자 토큰이 올바르지 않습니다."));
+		}
+		return ResponseEntity.ok(ApiResponse.success(
+				recommendationSyncService.syncRecommendationCandidateRegions(
+						themes,
+						contentTypeId,
+						arrange,
+						lclsSystm1,
+						lclsSystm2,
+						lclsSystm3,
+						limit,
+						pageSize
+				)
+		));
+	}
+
 	private boolean isAuthorized(String requestAdminToken) {
 		if (!StringUtils.hasText(adminToken)) {
 			return true;

@@ -1,6 +1,8 @@
 package com.trip.whereU.tourism.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.trip.whereU.recommendation.dto.PersonalizedRecommendationItemResponse;
@@ -123,6 +125,67 @@ class TourismContentRecommendationSyncServiceTest {
 		assertThat(response.totalFetchedCount()).isEqualTo(27);
 		assertThat(response.results()).extracting(TourismContentRecommendationTopSyncResponse.RegionResult::legalDongCode)
 				.containsExactly("28-110", "26-380");
+	}
+
+	@Test
+	void syncsTourismContentsForRecommendationCandidateRegionsWithoutDuplicates() {
+		when(valueRecommendationService.getLatestValueRecommendations(2))
+				.thenReturn(ValueRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(
+								recommendation(1, "11-11680", "서울특별시 강남구"),
+								recommendation(2, "28-28110", "인천광역시 중구")
+						)
+				));
+		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+				.thenReturn(PersonalizedRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(TourismTheme.NATURE),
+						List.of(
+								personalizedRecommendation(1, "28-28110", "인천광역시 중구"),
+								personalizedRecommendation(2, "26-26380", "부산광역시 사하구")
+						)
+				));
+		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.FOOD), 2))
+				.thenReturn(PersonalizedRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(TourismTheme.FOOD),
+						List.of(personalizedRecommendation(1, "47-47130", "경상북도 경주시"))
+				));
+		when(mappingRepository.findByEnabledTrueAndRegionCodeIn(List.of(
+				"11-11680",
+				"28-28110",
+				"26-26380",
+				"47-47130"
+		))).thenReturn(List.of());
+		when(tourismContentService.sync("12", "C", "11", "680", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(40, 40, 4));
+		when(tourismContentService.sync("12", "C", "28", "110", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(24, 24, 3));
+		when(tourismContentService.sync("12", "C", "26", "380", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(3, 3, 1));
+		when(tourismContentService.sync("12", "C", "47", "130", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(20, 20, 2));
+
+		TourismContentRecommendationTopSyncResponse response = service()
+				.syncRecommendationCandidateRegions(
+						List.of(TourismTheme.NATURE, TourismTheme.FOOD),
+						"12",
+						"C",
+						null,
+						null,
+						null,
+						2,
+						10
+				);
+
+		assertThat(response.requestedRegionCount()).isEqualTo(4);
+		assertThat(response.successRegionCount()).isEqualTo(4);
+		assertThat(response.totalSavedCount()).isEqualTo(87);
+		assertThat(response.results()).extracting(TourismContentRecommendationTopSyncResponse.RegionResult::regionCode)
+				.containsExactly("11-11680", "28-28110", "26-26380", "47-47130");
+		verify(tourismContentService, times(1))
+				.sync("12", "C", "28", "110", null, null, null, 10);
 	}
 
 	private TourismContentRecommendationSyncService service() {

@@ -125,3 +125,25 @@ curl -X POST \
 ```bash
 curl "http://localhost:8080/api/recommendations/personalized?themes=NATURE&limit=20"
 ```
+
+## 추천 후보 지역 사전 수집
+
+추천 점수가 바뀌어도 관광지 카드 이미지가 최대한 유지되도록, 가성비 추천과 테마별 맞춤 추천 후보 지역을 합쳐 미리 수집한다.
+
+운영 환경에서는 이 API를 수동으로 호출하거나, 이후 배치 작업에서 주기적으로 호출한다. 추천 조회 API는 외부 TourAPI를 직접 호출하지 않고 DB에 저장된 관광정보만 조회한다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-candidates?limit=100&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+`themes`를 생략하면 모든 맞춤 추천 테마를 각각 조회해 후보 지역을 수집한다. 특정 테마만 보강하려면 `themes`를 전달한다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-candidates?themes=NATURE&themes=FOOD&limit=100&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+Postman에서는 `POST` 메서드로 같은 URL을 입력하고, `Headers`에 `X-Admin-Token`, `Params`에 `limit`, `pageSize`, `contentTypeId`, `arrange`, 필요한 경우 `themes`를 추가한다. Body는 비워둔다.

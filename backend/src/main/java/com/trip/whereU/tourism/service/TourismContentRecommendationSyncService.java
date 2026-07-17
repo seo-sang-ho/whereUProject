@@ -12,6 +12,8 @@ import com.trip.whereU.tourism.dto.TourismContentSyncResponse;
 import com.trip.whereU.tourism.entity.TourismRegionTourApiMapping;
 import com.trip.whereU.tourism.repository.TourismRegionTourApiMappingRepository;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -80,6 +82,41 @@ public class TourismContentRecommendationSyncService {
 				recommendations.recommendations().stream()
 						.map(RecommendationRegion::from)
 						.toList(),
+				contentTypeId,
+				arrange,
+				categoryLevel1,
+				categoryLevel2,
+				categoryLevel3,
+				pageSize
+		);
+	}
+
+	public TourismContentRecommendationTopSyncResponse syncRecommendationCandidateRegions(
+			List<TourismTheme> themes,
+			String contentTypeId,
+			String arrange,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
+			int limit,
+			int pageSize
+	) {
+		List<RecommendationRegion> candidates = new ArrayList<>();
+		ValueRecommendationResponse valueRecommendations = valueRecommendationService.getLatestValueRecommendations(limit);
+		candidates.addAll(valueRecommendations.recommendations().stream()
+				.map(RecommendationRegion::from)
+				.toList());
+
+		for (TourismTheme theme : normalizeCandidateThemes(themes)) {
+			PersonalizedRecommendationResponse personalizedRecommendations =
+					personalizedRecommendationService.getLatestRecommendations(List.of(theme), limit);
+			candidates.addAll(personalizedRecommendations.recommendations().stream()
+					.map(RecommendationRegion::from)
+					.toList());
+		}
+
+		return syncRegions(
+				deduplicateRegions(candidates),
 				contentTypeId,
 				arrange,
 				categoryLevel1,
@@ -164,6 +201,33 @@ public class TourismContentRecommendationSyncService {
 					.ifPresent(syncRule -> syncRuleByRegion.put(regionCode, syncRule));
 		}
 		return syncRuleByRegion;
+	}
+
+	private List<TourismTheme> normalizeCandidateThemes(List<TourismTheme> themes) {
+		if (themes == null || themes.isEmpty()) {
+			return Arrays.asList(TourismTheme.values());
+		}
+		return Arrays.stream(TourismTheme.values())
+				.filter(themes::contains)
+				.toList();
+	}
+
+	private List<RecommendationRegion> deduplicateRegions(List<RecommendationRegion> candidates) {
+		Map<String, RecommendationRegion> uniqueRegions = new LinkedHashMap<>();
+		for (RecommendationRegion candidate : candidates) {
+			if (!StringUtils.hasText(candidate.regionCode())) {
+				continue;
+			}
+			uniqueRegions.computeIfAbsent(
+					candidate.regionCode(),
+					regionCode -> new RecommendationRegion(
+							uniqueRegions.size() + 1,
+							candidate.regionCode(),
+							candidate.regionName()
+					)
+			);
+		}
+		return List.copyOf(uniqueRegions.values());
 	}
 
 	private Optional<LegalDongCode> deriveLegalDongCode(String regionCode) {
