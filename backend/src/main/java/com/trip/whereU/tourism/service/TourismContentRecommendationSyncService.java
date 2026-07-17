@@ -2,7 +2,11 @@ package com.trip.whereU.tourism.service;
 
 import com.trip.whereU.recommendation.dto.ValueRecommendationItemResponse;
 import com.trip.whereU.recommendation.dto.ValueRecommendationResponse;
+import com.trip.whereU.recommendation.dto.PersonalizedRecommendationItemResponse;
+import com.trip.whereU.recommendation.dto.PersonalizedRecommendationResponse;
+import com.trip.whereU.recommendation.service.PersonalizedRecommendationService;
 import com.trip.whereU.recommendation.service.ValueRecommendationService;
+import com.trip.whereU.resourcedemand.entity.TourismTheme;
 import com.trip.whereU.tourism.dto.TourismContentRecommendationTopSyncResponse;
 import com.trip.whereU.tourism.dto.TourismContentSyncResponse;
 import com.trip.whereU.tourism.entity.TourismRegionTourApiMapping;
@@ -21,15 +25,18 @@ public class TourismContentRecommendationSyncService {
 	private static final String DEFAULT_ARRANGE = "C";
 
 	private final ValueRecommendationService valueRecommendationService;
+	private final PersonalizedRecommendationService personalizedRecommendationService;
 	private final TourismContentService tourismContentService;
 	private final TourismRegionTourApiMappingRepository mappingRepository;
 
 	public TourismContentRecommendationSyncService(
 			ValueRecommendationService valueRecommendationService,
+			PersonalizedRecommendationService personalizedRecommendationService,
 			TourismContentService tourismContentService,
 			TourismRegionTourApiMappingRepository mappingRepository
 	) {
 		this.valueRecommendationService = valueRecommendationService;
+		this.personalizedRecommendationService = personalizedRecommendationService;
 		this.tourismContentService = tourismContentService;
 		this.mappingRepository = mappingRepository;
 	}
@@ -44,9 +51,56 @@ public class TourismContentRecommendationSyncService {
 			int pageSize
 	) {
 		ValueRecommendationResponse recommendations = valueRecommendationService.getLatestValueRecommendations(limit);
-		Map<String, SyncRule> syncRuleByRegion = findSyncRules(recommendations.recommendations());
+		return syncRegions(
+				recommendations.recommendations().stream()
+						.map(RecommendationRegion::from)
+						.toList(),
+				contentTypeId,
+				arrange,
+				categoryLevel1,
+				categoryLevel2,
+				categoryLevel3,
+				pageSize
+		);
+	}
+
+	public TourismContentRecommendationTopSyncResponse syncPersonalizedRecommendationTopRegions(
+			List<TourismTheme> themes,
+			String contentTypeId,
+			String arrange,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
+			int limit,
+			int pageSize
+	) {
+		PersonalizedRecommendationResponse recommendations =
+				personalizedRecommendationService.getLatestRecommendations(themes, limit);
+		return syncRegions(
+				recommendations.recommendations().stream()
+						.map(RecommendationRegion::from)
+						.toList(),
+				contentTypeId,
+				arrange,
+				categoryLevel1,
+				categoryLevel2,
+				categoryLevel3,
+				pageSize
+		);
+	}
+
+	private TourismContentRecommendationTopSyncResponse syncRegions(
+			List<RecommendationRegion> recommendations,
+			String contentTypeId,
+			String arrange,
+			String categoryLevel1,
+			String categoryLevel2,
+			String categoryLevel3,
+			int pageSize
+	) {
+		Map<String, SyncRule> syncRuleByRegion = findSyncRules(recommendations);
 		List<TourismContentRecommendationTopSyncResponse.RegionResult> results = new ArrayList<>();
-		for (ValueRecommendationItemResponse recommendation : recommendations.recommendations()) {
+		for (RecommendationRegion recommendation : recommendations) {
 			SyncRule syncRule = syncRuleByRegion.get(recommendation.regionCode());
 			if (syncRule == null) {
 				results.add(TourismContentRecommendationTopSyncResponse.RegionResult.failure(
@@ -90,9 +144,9 @@ public class TourismContentRecommendationSyncService {
 		return TourismContentRecommendationTopSyncResponse.of(results);
 	}
 
-	private Map<String, SyncRule> findSyncRules(List<ValueRecommendationItemResponse> recommendations) {
+	private Map<String, SyncRule> findSyncRules(List<RecommendationRegion> recommendations) {
 		List<String> regionCodes = recommendations.stream()
-				.map(ValueRecommendationItemResponse::regionCode)
+				.map(RecommendationRegion::regionCode)
 				.filter(StringUtils::hasText)
 				.distinct()
 				.toList();
@@ -155,6 +209,25 @@ public class TourismContentRecommendationSyncService {
 
 		private static String defaultIfBlank(String value, String defaultValue) {
 			return StringUtils.hasText(value) ? value : defaultValue;
+		}
+	}
+
+	private record RecommendationRegion(int rank, String regionCode, String regionName) {
+
+		private static RecommendationRegion from(ValueRecommendationItemResponse recommendation) {
+			return new RecommendationRegion(
+					recommendation.rank(),
+					recommendation.regionCode(),
+					recommendation.regionName()
+			);
+		}
+
+		private static RecommendationRegion from(PersonalizedRecommendationItemResponse recommendation) {
+			return new RecommendationRegion(
+					recommendation.rank(),
+					recommendation.regionCode(),
+					recommendation.regionName()
+			);
 		}
 	}
 }

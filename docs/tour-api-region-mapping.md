@@ -101,3 +101,27 @@ curl -X POST \
   -H "X-Admin-Token: [REDACTED]" \
   "http://localhost:8080/api/admin/tourism-contents/sync/recommendation-top?limit=10&pageSize=10&contentTypeId=12&arrange=C&lclsSystm1=NA&lclsSystm2=NA04&lclsSystm3=NA040500"
 ```
+
+## 맞춤 추천 TOP 지역 자동 수집
+
+테마별 맞춤 추천 지역의 관광정보도 관리자 API로 미리 수집한다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/personalized-top?themes=NATURE&limit=20&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+여러 테마를 조합하려면 `themes`를 반복해서 전달한다.
+
+```bash
+curl -X POST \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/sync/personalized-top?themes=NATURE&themes=FOOD&limit=20&pageSize=10&contentTypeId=12&arrange=C"
+```
+
+수집 후 맞춤 추천 API에서 해당 지역의 관광지 카드가 채워졌는지 확인한다.
+
+```bash
+curl "http://localhost:8080/api/recommendations/personalized?themes=NATURE&limit=20"
+```

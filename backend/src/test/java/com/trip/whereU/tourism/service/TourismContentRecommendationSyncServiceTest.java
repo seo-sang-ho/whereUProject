@@ -3,9 +3,13 @@ package com.trip.whereU.tourism.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import com.trip.whereU.recommendation.dto.PersonalizedRecommendationItemResponse;
+import com.trip.whereU.recommendation.dto.PersonalizedRecommendationResponse;
 import com.trip.whereU.recommendation.dto.ValueRecommendationItemResponse;
 import com.trip.whereU.recommendation.dto.ValueRecommendationResponse;
+import com.trip.whereU.recommendation.service.PersonalizedRecommendationService;
 import com.trip.whereU.recommendation.service.ValueRecommendationService;
+import com.trip.whereU.resourcedemand.entity.TourismTheme;
 import com.trip.whereU.tourism.dto.TourismContentRecommendationTopSyncResponse;
 import com.trip.whereU.tourism.dto.TourismContentSyncResponse;
 import com.trip.whereU.tourism.entity.TourismRegionTourApiMapping;
@@ -22,6 +26,8 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Mock
 	private ValueRecommendationService valueRecommendationService;
+	@Mock
+	private PersonalizedRecommendationService personalizedRecommendationService;
 	@Mock
 	private TourismContentService tourismContentService;
 	@Mock
@@ -82,9 +88,47 @@ class TourismContentRecommendationSyncServiceTest {
 		assertThat(response.totalSavedCount()).isEqualTo(3);
 	}
 
+	@Test
+	void syncsTourismContentsForPersonalizedRecommendationTopRegions() {
+		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+				.thenReturn(PersonalizedRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(TourismTheme.NATURE),
+						List.of(
+								personalizedRecommendation(1, "28-28110", "인천광역시 중구"),
+								personalizedRecommendation(2, "26-26380", "부산광역시 사하구")
+						)
+				));
+		when(mappingRepository.findByEnabledTrueAndRegionCodeIn(List.of("28-28110", "26-26380")))
+				.thenReturn(List.of());
+		when(tourismContentService.sync("12", "C", "28", "110", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(24, 24, 3));
+		when(tourismContentService.sync("12", "C", "26", "380", null, null, null, 10))
+				.thenReturn(new TourismContentSyncResponse(3, 3, 1));
+
+		TourismContentRecommendationTopSyncResponse response = service()
+				.syncPersonalizedRecommendationTopRegions(
+						List.of(TourismTheme.NATURE),
+						"12",
+						"C",
+						null,
+						null,
+						null,
+						2,
+						10
+				);
+
+		assertThat(response.requestedRegionCount()).isEqualTo(2);
+		assertThat(response.successRegionCount()).isEqualTo(2);
+		assertThat(response.totalFetchedCount()).isEqualTo(27);
+		assertThat(response.results()).extracting(TourismContentRecommendationTopSyncResponse.RegionResult::legalDongCode)
+				.containsExactly("28-110", "26-380");
+	}
+
 	private TourismContentRecommendationSyncService service() {
 		return new TourismContentRecommendationSyncService(
 				valueRecommendationService,
+				personalizedRecommendationService,
 				tourismContentService,
 				mappingRepository
 		);
@@ -102,6 +146,28 @@ class TourismContentRecommendationSyncServiceTest {
 				0.85,
 				85,
 				"추천 지역입니다.",
+				37.5,
+				127.0,
+				List.of()
+		);
+	}
+
+	private PersonalizedRecommendationItemResponse personalizedRecommendation(
+			int rank,
+			String regionCode,
+			String regionName
+	) {
+		return new PersonalizedRecommendationItemResponse(
+				rank,
+				regionCode,
+				regionName,
+				0.8,
+				50,
+				0.5,
+				0.71,
+				71,
+				"맞춤 추천 지역입니다.",
+				List.of(),
 				37.5,
 				127.0,
 				List.of()
