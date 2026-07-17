@@ -13,8 +13,11 @@ import com.trip.whereU.recommendation.service.PersonalizedRecommendationService;
 import com.trip.whereU.recommendation.service.ValueRecommendationService;
 import com.trip.whereU.resourcedemand.entity.TourismTheme;
 import com.trip.whereU.tourism.dto.TourismContentRecommendationTopSyncResponse;
+import com.trip.whereU.tourism.dto.TourismContentRecommendationImageStatusResponse;
 import com.trip.whereU.tourism.dto.TourismContentSyncResponse;
+import com.trip.whereU.tourism.entity.TourismContent;
 import com.trip.whereU.tourism.entity.TourismRegionTourApiMapping;
+import com.trip.whereU.tourism.repository.TourismContentRepository;
 import com.trip.whereU.tourism.repository.TourismRegionTourApiMappingRepository;
 import java.time.LocalDate;
 import java.util.List;
@@ -34,6 +37,8 @@ class TourismContentRecommendationSyncServiceTest {
 	private TourismContentService tourismContentService;
 	@Mock
 	private TourismRegionTourApiMappingRepository mappingRepository;
+	@Mock
+	private TourismContentRepository tourismContentRepository;
 
 	@Test
 	void syncsTourismContentsForValueRecommendationTopRegions() {
@@ -188,12 +193,58 @@ class TourismContentRecommendationSyncServiceTest {
 				.sync("12", "C", "28", "110", null, null, null, 10);
 	}
 
+	@Test
+	void reportsRecommendationCandidateImageStatus() {
+		when(valueRecommendationService.getLatestValueRecommendations(2))
+				.thenReturn(ValueRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(
+								recommendation(1, "11-11680", "서울특별시 강남구"),
+								recommendation(2, "28-28110", "인천광역시 중구")
+						)
+				));
+		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+				.thenReturn(PersonalizedRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(TourismTheme.NATURE),
+						List.of(
+								personalizedRecommendation(1, "28-28110", "인천광역시 중구"),
+								personalizedRecommendation(2, "26-26380", "부산광역시 사하구")
+						)
+				));
+		when(mappingRepository.findByEnabledTrueAndRegionCodeIn(List.of(
+				"11-11680",
+				"28-28110",
+				"26-26380"
+		))).thenReturn(List.of());
+		when(tourismContentRepository.findByLegalDongCodeIn(List.of("11-680", "28-110", "26-380")))
+				.thenReturn(List.of(
+						content("1", "이미지 있음", "11-680", "NA040500", "20260420173053", "https://example.com/a.jpg"),
+						content("2", "이미지 없음", "28-110", "NA040500", "20260420173054", null)
+				));
+
+		TourismContentRecommendationImageStatusResponse response = service()
+				.findRecommendationCandidateImageStatus(List.of(TourismTheme.NATURE), 2);
+
+		assertThat(response.checkedRegionCount()).isEqualTo(3);
+		assertThat(response.imageReadyRegionCount()).isEqualTo(1);
+		assertThat(response.missingImageRegionCount()).isEqualTo(1);
+		assertThat(response.noContentRegionCount()).isEqualTo(1);
+		assertThat(response.results())
+				.extracting(TourismContentRecommendationImageStatusResponse.RegionImageStatus::status)
+				.containsExactly("IMAGE_READY", "MISSING_IMAGE", "NO_CONTENT");
+		assertThat(response.results())
+				.extracting(TourismContentRecommendationImageStatusResponse.RegionImageStatus::legalDongCode)
+				.containsExactly("11-680", "28-110", "26-380");
+	}
+
 	private TourismContentRecommendationSyncService service() {
 		return new TourismContentRecommendationSyncService(
 				valueRecommendationService,
 				personalizedRecommendationService,
 				tourismContentService,
-				mappingRepository
+				mappingRepository,
+				tourismContentRepository
 		);
 	}
 
@@ -234,6 +285,37 @@ class TourismContentRecommendationSyncServiceTest {
 				37.5,
 				127.0,
 				List.of()
+		);
+	}
+
+	private TourismContent content(
+			String contentId,
+			String title,
+			String legalDongCode,
+			String categoryCode,
+			String modifiedTime,
+			String firstImage
+	) {
+		return new TourismContent(
+				contentId,
+				"12",
+				title,
+				"테스트 주소",
+				null,
+				37.5,
+				127.0,
+				null,
+				null,
+				legalDongCode,
+				categoryCode,
+				null,
+				null,
+				null,
+				firstImage,
+				null,
+				null,
+				null,
+				modifiedTime
 		);
 	}
 }

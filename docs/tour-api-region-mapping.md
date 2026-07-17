@@ -147,3 +147,32 @@ curl -X POST \
 ```
 
 Postman에서는 `POST` 메서드로 같은 URL을 입력하고, `Headers`에 `X-Admin-Token`, `Params`에 `limit`, `pageSize`, `contentTypeId`, `arrange`, 필요한 경우 `themes`를 추가한다. Body는 비워둔다.
+
+## 추천 후보 이미지 상태 진단
+
+추천 후보 지역 중 관광지 이미지가 없는 지역을 확인하려면 관리자 진단 API를 호출한다.
+
+```bash
+curl \
+  -H "X-Admin-Token: [REDACTED]" \
+  "http://localhost:8080/api/admin/tourism-contents/recommendation-candidates/image-status?limit=100"
+```
+
+Postman에서는 `GET` 메서드로 호출한다.
+
+| 위치 | Key | Value |
+| --- | --- | --- |
+| Headers | `X-Admin-Token` | 관리자 토큰 |
+| Params | `limit` | `100` |
+| Params | `themes` | 선택, 예: `NATURE` |
+
+`themes`를 생략하면 모든 맞춤 추천 테마와 가성비 추천 후보를 함께 진단한다.
+
+응답의 `status` 값은 다음 의미를 가진다.
+
+| status | 의미 | 후속 조치 |
+| --- | --- | --- |
+| `IMAGE_READY` | 저장된 관광정보 중 이미지가 있는 콘텐츠가 있다. | 조치 불필요 |
+| `MISSING_IMAGE` | 저장된 관광정보는 있지만 이미지가 없다. | 다른 분류 조건으로 재수집하거나 대체 이미지 정책 검토 |
+| `NO_CONTENT` | 해당 법정동 코드로 저장된 관광정보가 없다. | sync 실행 또는 `tourism_region_tour_api_mapping` 확인 |
+| `MAPPING_MISSING` | 추천 지역 코드를 TourAPI 법정동 코드로 변환하지 못했다. | 명시 매핑 추가 |

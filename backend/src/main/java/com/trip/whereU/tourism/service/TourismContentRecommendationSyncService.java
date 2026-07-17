@@ -7,9 +7,12 @@ import com.trip.whereU.recommendation.dto.PersonalizedRecommendationResponse;
 import com.trip.whereU.recommendation.service.PersonalizedRecommendationService;
 import com.trip.whereU.recommendation.service.ValueRecommendationService;
 import com.trip.whereU.resourcedemand.entity.TourismTheme;
+import com.trip.whereU.tourism.dto.TourismContentRecommendationImageStatusResponse;
 import com.trip.whereU.tourism.dto.TourismContentRecommendationTopSyncResponse;
 import com.trip.whereU.tourism.dto.TourismContentSyncResponse;
+import com.trip.whereU.tourism.entity.TourismContent;
 import com.trip.whereU.tourism.entity.TourismRegionTourApiMapping;
+import com.trip.whereU.tourism.repository.TourismContentRepository;
 import com.trip.whereU.tourism.repository.TourismRegionTourApiMappingRepository;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,17 +33,20 @@ public class TourismContentRecommendationSyncService {
 	private final PersonalizedRecommendationService personalizedRecommendationService;
 	private final TourismContentService tourismContentService;
 	private final TourismRegionTourApiMappingRepository mappingRepository;
+	private final TourismContentRepository tourismContentRepository;
 
 	public TourismContentRecommendationSyncService(
 			ValueRecommendationService valueRecommendationService,
 			PersonalizedRecommendationService personalizedRecommendationService,
 			TourismContentService tourismContentService,
-			TourismRegionTourApiMappingRepository mappingRepository
+			TourismRegionTourApiMappingRepository mappingRepository,
+			TourismContentRepository tourismContentRepository
 	) {
 		this.valueRecommendationService = valueRecommendationService;
 		this.personalizedRecommendationService = personalizedRecommendationService;
 		this.tourismContentService = tourismContentService;
 		this.mappingRepository = mappingRepository;
+		this.tourismContentRepository = tourismContentRepository;
 	}
 
 	public TourismContentRecommendationTopSyncResponse syncValueRecommendationTopRegions(
@@ -101,22 +107,8 @@ public class TourismContentRecommendationSyncService {
 			int limit,
 			int pageSize
 	) {
-		List<RecommendationRegion> candidates = new ArrayList<>();
-		ValueRecommendationResponse valueRecommendations = valueRecommendationService.getLatestValueRecommendations(limit);
-		candidates.addAll(valueRecommendations.recommendations().stream()
-				.map(RecommendationRegion::from)
-				.toList());
-
-		for (TourismTheme theme : normalizeCandidateThemes(themes)) {
-			PersonalizedRecommendationResponse personalizedRecommendations =
-					personalizedRecommendationService.getLatestRecommendations(List.of(theme), limit);
-			candidates.addAll(personalizedRecommendations.recommendations().stream()
-					.map(RecommendationRegion::from)
-					.toList());
-		}
-
 		return syncRegions(
-				deduplicateRegions(candidates),
+				findRecommendationCandidateRegions(themes, limit),
 				contentTypeId,
 				arrange,
 				categoryLevel1,
@@ -124,6 +116,62 @@ public class TourismContentRecommendationSyncService {
 				categoryLevel3,
 				pageSize
 		);
+	}
+
+	public TourismContentRecommendationImageStatusResponse findRecommendationCandidateImageStatus(
+			List<TourismTheme> themes,
+			int limit
+	) {
+		List<RecommendationRegion> candidates = findRecommendationCandidateRegions(themes, limit);
+		Map<String, SyncRule> syncRuleByRegion = findSyncRules(candidates);
+		List<String> legalDongCodes = syncRuleByRegion.values().stream()
+				.map(syncRule -> syncRule.legalDongCode().value())
+				.distinct()
+				.toList();
+		Map<String, List<TourismContent>> contentByLegalDongCode = legalDongCodes.isEmpty()
+				? Map.of()
+				: tourismContentRepository
+						.findByLegalDongCodeIn(legalDongCodes)
+						.stream()
+						.collect(java.util.stream.Collectors.groupingBy(TourismContent::getLegalDongCode));
+
+		List<TourismContentRecommendationImageStatusResponse.RegionImageStatus> results = new ArrayList<>();
+		for (RecommendationRegion candidate : candidates) {
+			SyncRule syncRule = syncRuleByRegion.get(candidate.regionCode());
+			if (syncRule == null) {
+				results.add(new TourismContentRecommendationImageStatusResponse.RegionImageStatus(
+						candidate.rank(),
+						candidate.regionCode(),
+						candidate.regionName(),
+						null,
+						"MAPPING_MISSING",
+						0,
+						0,
+						"추천 지역 코드를 TourAPI 법정동 코드로 변환할 수 없습니다."
+				));
+				continue;
+			}
+
+			List<TourismContent> contents = contentByLegalDongCode
+					.getOrDefault(syncRule.legalDongCode().value(), List.of())
+					.stream()
+					.filter(content -> matches(content, syncRule))
+					.toList();
+			int imageContentCount = (int) contents.stream()
+					.filter(this::hasAnyImage)
+					.count();
+			results.add(new TourismContentRecommendationImageStatusResponse.RegionImageStatus(
+					candidate.rank(),
+					candidate.regionCode(),
+					candidate.regionName(),
+					syncRule.legalDongCode().value(),
+					imageStatus(contents.size(), imageContentCount),
+					contents.size(),
+					imageContentCount,
+					imageStatusMessage(contents.size(), imageContentCount)
+			));
+		}
+		return TourismContentRecommendationImageStatusResponse.of(results);
 	}
 
 	private TourismContentRecommendationTopSyncResponse syncRegions(
@@ -187,7 +235,7 @@ public class TourismContentRecommendationSyncService {
 				.filter(StringUtils::hasText)
 				.distinct()
 				.toList();
-		Map<String, SyncRule> syncRuleByRegion = new java.util.HashMap<>();
+		Map<String, SyncRule> syncRuleByRegion = new LinkedHashMap<>();
 		for (TourismRegionTourApiMapping mapping : mappingRepository.findByEnabledTrueAndRegionCodeIn(regionCodes)) {
 			SyncRule.from(mapping).ifPresent(syncRule -> syncRuleByRegion.putIfAbsent(mapping.getRegionCode(), syncRule));
 		}
@@ -201,6 +249,23 @@ public class TourismContentRecommendationSyncService {
 					.ifPresent(syncRule -> syncRuleByRegion.put(regionCode, syncRule));
 		}
 		return syncRuleByRegion;
+	}
+
+	private List<RecommendationRegion> findRecommendationCandidateRegions(List<TourismTheme> themes, int limit) {
+		List<RecommendationRegion> candidates = new ArrayList<>();
+		ValueRecommendationResponse valueRecommendations = valueRecommendationService.getLatestValueRecommendations(limit);
+		candidates.addAll(valueRecommendations.recommendations().stream()
+				.map(RecommendationRegion::from)
+				.toList());
+
+		for (TourismTheme theme : normalizeCandidateThemes(themes)) {
+			PersonalizedRecommendationResponse personalizedRecommendations =
+					personalizedRecommendationService.getLatestRecommendations(List.of(theme), limit);
+			candidates.addAll(personalizedRecommendations.recommendations().stream()
+					.map(RecommendationRegion::from)
+					.toList());
+		}
+		return deduplicateRegions(candidates);
 	}
 
 	private List<TourismTheme> normalizeCandidateThemes(List<TourismTheme> themes) {
@@ -228,6 +293,39 @@ public class TourismContentRecommendationSyncService {
 			);
 		}
 		return List.copyOf(uniqueRegions.values());
+	}
+
+	private boolean matches(TourismContent content, SyncRule syncRule) {
+		return matchesValue(content.getContentTypeId(), syncRule.contentTypeId())
+				&& matchesValue(content.getCategoryCode(), syncRule.categoryCode());
+	}
+
+	private boolean matchesValue(String actualValue, String expectedValue) {
+		return !StringUtils.hasText(expectedValue) || expectedValue.equals(actualValue);
+	}
+
+	private boolean hasAnyImage(TourismContent content) {
+		return StringUtils.hasText(content.getFirstImage()) || StringUtils.hasText(content.getFirstImage2());
+	}
+
+	private String imageStatus(int contentCount, int imageContentCount) {
+		if (contentCount == 0) {
+			return "NO_CONTENT";
+		}
+		if (imageContentCount == 0) {
+			return "MISSING_IMAGE";
+		}
+		return "IMAGE_READY";
+	}
+
+	private String imageStatusMessage(int contentCount, int imageContentCount) {
+		if (contentCount == 0) {
+			return "저장된 관광정보가 없습니다. sync 또는 지역 매핑 확인이 필요합니다.";
+		}
+		if (imageContentCount == 0) {
+			return "저장된 관광정보는 있지만 이미지가 없습니다.";
+		}
+		return null;
 	}
 
 	private Optional<LegalDongCode> deriveLegalDongCode(String regionCode) {
