@@ -2,6 +2,7 @@ package com.trip.whereU.recommendation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.trip.whereU.map.entity.TourismRegion;
@@ -12,6 +13,7 @@ import com.trip.whereU.servicedemand.entity.TourismServiceDemand;
 import com.trip.whereU.servicedemand.repository.TourismServiceDemandRepository;
 import com.trip.whereU.staystrength.entity.TourismStayStrength;
 import com.trip.whereU.staystrength.repository.TourismStayStrengthRepository;
+import com.trip.whereU.tourism.service.TourismContentBackfillService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,8 @@ class ValueRecommendationServiceTest {
 	private TourismRegionRepository regionRepository;
 	@Mock
 	private RecommendationTourismContentService recommendationTourismContentService;
+	@Mock
+	private TourismContentBackfillService tourismContentBackfillService;
 
 	@Test
 	void ranksHighServiceDemandAndLowStayStrengthFirstUsingLatestCommonMonth() {
@@ -70,6 +74,13 @@ class ValueRecommendationServiceTest {
 		assertThat(response.recommendations().getFirst().tourismContents())
 				.extracting(RecommendedTourismContentResponse::title)
 				.containsExactly("을숙도 공원");
+		verify(tourismContentBackfillService).requestBackfillForMissingImages(
+				List.of("11-11110", "11-11140"),
+				java.util.Map.of(
+						"11-11110",
+						List.of(tourismContent("127974", "을숙도 공원"))
+				)
+		);
 	}
 
 	@Test
@@ -111,7 +122,8 @@ class ValueRecommendationServiceTest {
 				serviceDemandRepository,
 				stayStrengthRepository,
 				regionRepository,
-				recommendationTourismContentService
+				recommendationTourismContentService,
+				tourismContentBackfillService
 		);
 	}
 

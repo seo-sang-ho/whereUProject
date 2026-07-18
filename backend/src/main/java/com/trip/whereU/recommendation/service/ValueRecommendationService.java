@@ -9,6 +9,7 @@ import com.trip.whereU.servicedemand.entity.TourismServiceDemand;
 import com.trip.whereU.servicedemand.repository.TourismServiceDemandRepository;
 import com.trip.whereU.staystrength.entity.TourismStayStrength;
 import com.trip.whereU.staystrength.repository.TourismStayStrengthRepository;
+import com.trip.whereU.tourism.service.TourismContentBackfillService;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -33,17 +34,20 @@ public class ValueRecommendationService {
 	private final TourismStayStrengthRepository stayStrengthRepository;
 	private final TourismRegionRepository regionRepository;
 	private final RecommendationTourismContentService recommendationTourismContentService;
+	private final TourismContentBackfillService tourismContentBackfillService;
 
 	public ValueRecommendationService(
 			TourismServiceDemandRepository serviceDemandRepository,
 			TourismStayStrengthRepository stayStrengthRepository,
 			TourismRegionRepository regionRepository,
-			RecommendationTourismContentService recommendationTourismContentService
+			RecommendationTourismContentService recommendationTourismContentService,
+			TourismContentBackfillService tourismContentBackfillService
 	) {
 		this.serviceDemandRepository = serviceDemandRepository;
 		this.stayStrengthRepository = stayStrengthRepository;
 		this.regionRepository = regionRepository;
 		this.recommendationTourismContentService = recommendationTourismContentService;
+		this.tourismContentBackfillService = tourismContentBackfillService;
 	}
 
 	@Transactional(readOnly = true)
@@ -83,6 +87,7 @@ public class ValueRecommendationService {
 						regionCodes,
 						TOURISM_CONTENT_LIMIT_PER_REGION
 				);
+		tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
 
 		List<ValueRecommendationItemResponse> recommendations = java.util.stream.IntStream
 				.range(0, candidates.size())
