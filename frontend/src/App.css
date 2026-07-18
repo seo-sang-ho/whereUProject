@@ -501,6 +501,11 @@
   border-radius: 6px;
 }
 
+.tourism-card-preview.is-fallback {
+  background: #f4f7f5;
+  border-style: dashed;
+}
+
 .tourism-card-preview img,
 .tourism-card-placeholder {
   width: 52px;
@@ -518,7 +523,7 @@
   display: grid;
   place-items: center;
   color: #ffffff;
-  background: #6f8f7c;
+  background: linear-gradient(135deg, #4d7d63, #7c9386);
   font-size: 15px;
   font-weight: 800;
 }

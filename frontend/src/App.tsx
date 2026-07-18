@@ -14,6 +14,14 @@ type MapMode = 'strength' | 'recommendation' | 'personalized'
 
 type MapRecommendation = ValueRecommendation | PersonalizedRecommendation
 
+interface TourismCardPreview {
+  title: string
+  address: string
+  imageUrl: string | null
+  placeholderLabel: string
+  isFallback: boolean
+}
+
 interface MapOverlay {
   marker: naver.maps.Marker
   listener: naver.maps.MapEventListener
@@ -70,6 +78,49 @@ function formatReferenceMonth(referenceDate: string | null | undefined): string 
   }
   const [year, month] = referenceDate.split('-')
   return `${year}.${month} 기준`
+}
+
+function buildTourismCardPreview(recommendation: MapRecommendation): TourismCardPreview {
+  const primaryTourismContent = recommendation.tourismContents[0]
+  if (primaryTourismContent) {
+    return {
+      title: primaryTourismContent.title,
+      address: primaryTourismContent.address ?? recommendation.regionName,
+      imageUrl: primaryTourismContent.firstImage,
+      placeholderLabel: primaryTourismContent.title.slice(0, 1),
+      isFallback: false,
+    }
+  }
+
+  return {
+    title: recommendation.regionName,
+    address: '추천 지역 관광정보 준비 중',
+    imageUrl: null,
+    placeholderLabel: recommendation.regionName.slice(0, 1),
+    isFallback: true,
+  }
+}
+
+function renderTourismCardPreview(preview: TourismCardPreview) {
+  return (
+    <span className={preview.isFallback ? 'tourism-card-preview is-fallback' : 'tourism-card-preview'}>
+      {preview.imageUrl ? (
+        <img
+          src={preview.imageUrl}
+          alt=""
+          loading="lazy"
+        />
+      ) : (
+        <span className="tourism-card-placeholder">
+          {preview.placeholderLabel}
+        </span>
+      )}
+      <span className="tourism-card-copy">
+        <strong>{preview.title}</strong>
+        <span>{preview.address}</span>
+      </span>
+    </span>
+  )
 }
 
 function isClusterFeature(
@@ -432,7 +483,7 @@ function App() {
               <ol className="recommendation-list" aria-label="가성비 여행지 추천 순위">
                 {recommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
-                  const primaryTourismContent = recommendation.tourismContents[0]
+                  const tourismCardPreview = buildTourismCardPreview(recommendation)
                   return (
                     <li key={recommendation.regionCode}>
                       <button
@@ -450,25 +501,7 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
-                        {primaryTourismContent && (
-                          <span className="tourism-card-preview">
-                            {primaryTourismContent.firstImage ? (
-                              <img
-                                src={primaryTourismContent.firstImage}
-                                alt=""
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span className="tourism-card-placeholder">
-                                {primaryTourismContent.title.slice(0, 1)}
-                              </span>
-                            )}
-                            <span className="tourism-card-copy">
-                              <strong>{primaryTourismContent.title}</strong>
-                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
-                            </span>
-                          </span>
-                        )}
+                        {renderTourismCardPreview(tourismCardPreview)}
                         {selected && (
                           <span className="recommendation-metrics">
                             <span>서비스 수요 <b>{Math.round(recommendation.normalizedServiceDemand * 100)}</b></span>
@@ -515,7 +548,7 @@ function App() {
               <ol className="recommendation-list" aria-label="개인 맞춤 여행지 추천 순위">
                 {personalizedRecommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
-                  const primaryTourismContent = recommendation.tourismContents[0]
+                  const tourismCardPreview = buildTourismCardPreview(recommendation)
                   return (
                     <li key={recommendation.regionCode}>
                       <button
@@ -533,25 +566,7 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
-                        {primaryTourismContent && (
-                          <span className="tourism-card-preview">
-                            {primaryTourismContent.firstImage ? (
-                              <img
-                                src={primaryTourismContent.firstImage}
-                                alt=""
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span className="tourism-card-placeholder">
-                                {primaryTourismContent.title.slice(0, 1)}
-                              </span>
-                            )}
-                            <span className="tourism-card-copy">
-                              <strong>{primaryTourismContent.title}</strong>
-                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
-                            </span>
-                          </span>
-                        )}
+                        {renderTourismCardPreview(tourismCardPreview)}
                         {selected && (
                           <span className="personalized-detail">
                             <span className="recommendation-metrics">
