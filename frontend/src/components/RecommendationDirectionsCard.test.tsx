@@ -224,8 +224,8 @@ describe('RecommendationDirectionsCard', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('목적지 좌표가 없으면 잘못된 경로 대신 장소 검색 링크를 사용한다', async () => {
-    mocks.fetchDirectionsAvailability.mockResolvedValue({ status: 'NAVER_MAP_REQUIRED' })
+  it('가용해도 목적지 좌표가 없으면 위치와 경로를 요청하지 않고 장소 검색을 사용한다', async () => {
+    mocks.fetchDirectionsAvailability.mockResolvedValue({ status: 'AVAILABLE' })
     const user = userEvent.setup()
     renderCard({
       destination: { ...destination, latitude: null, longitude: null },
@@ -239,6 +239,9 @@ describe('RecommendationDirectionsCard', () => {
     expect(url.searchParams.get('query')).toBe(destination.title)
     expect(url.searchParams.has('dlat')).toBe(false)
     expect(url.searchParams.has('dlng')).toBe(false)
+    expect(mocks.fetchDirectionsAvailability).toHaveBeenCalledOnce()
+    expect(mocks.requestCurrentPosition).not.toHaveBeenCalled()
+    expect(mocks.fetchDrivingEstimate).not.toHaveBeenCalled()
   })
 
   it('mobileInline이면 모바일 modifier와 네이버 지도 앱 링크를 사용한다', async () => {
