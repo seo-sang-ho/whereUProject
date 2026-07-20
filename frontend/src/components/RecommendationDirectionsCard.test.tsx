@@ -100,6 +100,8 @@ describe('RecommendationDirectionsCard', () => {
     await user.click(screen.getByRole('button', { name: '자동차 시간 확인' }))
 
     expect(await screen.findByRole('link', { name: '네이버 지도에서 길찾기' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '앱이 열리지 않으면 웹에서 확인' }))
+      .not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '자동차 시간 확인' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
     expect(mocks.requestCurrentPosition).not.toHaveBeenCalled()
@@ -252,9 +254,24 @@ describe('RecommendationDirectionsCard', () => {
     await user.click(screen.getByRole('button', { name: '자동차 시간 확인' }))
 
     expect(container.firstElementChild).toHaveClass('directions-card--mobile-inline')
-    expect(await screen.findByRole('link', { name: '네이버 지도에서 길찾기' })).toHaveAttribute(
+    const appLink = await screen.findByRole('link', { name: '네이버 지도에서 길찾기' })
+    expect(appLink).toHaveAttribute(
       'href',
       expect.stringMatching(/^nmap:\/\/route\/car\?/),
     )
+    expect(appLink).toHaveAttribute('target', '_blank')
+    expect(appLink).toHaveAttribute('rel', 'noopener noreferrer')
+
+    const webFallbackLink = screen.getByRole('link', {
+      name: '앱이 열리지 않으면 웹에서 확인',
+    })
+    const webFallbackUrl = new URL(webFallbackLink.getAttribute('href') ?? '')
+    expect(webFallbackUrl.origin).toBe('https://map.naver.com')
+    expect(webFallbackUrl.pathname).toBe('/p/directions')
+    expect(webFallbackUrl.searchParams.get('dlat')).toBe('37.579617')
+    expect(webFallbackUrl.searchParams.get('dlng')).toBe('126.977041')
+    expect(webFallbackUrl.searchParams.get('dname')).toBe('경복궁')
+    expect(webFallbackLink).toHaveAttribute('target', '_blank')
+    expect(webFallbackLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 })

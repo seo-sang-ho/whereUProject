@@ -144,16 +144,25 @@ function RecommendationDirectionsCardContent({
     }
   }
 
+  const naverDestination = {
+    latitude: destination.latitude,
+    longitude: destination.longitude,
+    name: destination.title,
+  }
   const naverLink = buildNaverDirectionsLink(
     mobileInline ? 'mobile' : 'desktop',
-    {
-      latitude: destination.latitude,
-      longitude: destination.longitude,
-      name: destination.title,
-    },
+    naverDestination,
     state.origin,
     window.location.origin,
   )
+  const naverWebFallbackLink = mobileInline && hasValidDestinationCoordinates(destination)
+    ? buildNaverDirectionsLink(
+        'desktop',
+        naverDestination,
+        state.origin,
+        window.location.origin,
+      )
+    : undefined
 
   return (
     <section
@@ -213,7 +222,10 @@ function RecommendationDirectionsCardContent({
                 <dd>{formatTollFare(state.estimate.tollFare)}</dd>
               </div>
             </dl>
-            <NaverDirectionsLink href={naverLink} />
+            <NaverDirectionsLink
+              href={naverLink}
+              webFallbackHref={naverWebFallbackLink}
+            />
           </>
         )}
 
@@ -230,7 +242,10 @@ function RecommendationDirectionsCardContent({
                   다시 시도
                 </button>
               )}
-              <NaverDirectionsLink href={naverLink} />
+              <NaverDirectionsLink
+                href={naverLink}
+                webFallbackHref={naverWebFallbackLink}
+              />
             </div>
           </div>
         )}
@@ -239,16 +254,34 @@ function RecommendationDirectionsCardContent({
   )
 }
 
-function NaverDirectionsLink({ href }: { href: string }) {
+function NaverDirectionsLink({
+  href,
+  webFallbackHref,
+}: {
+  href: string
+  webFallbackHref?: string
+}) {
   return (
-    <a
-      className="directions-card__button directions-card__button--naver"
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      네이버 지도에서 길찾기
-    </a>
+    <div className="directions-card__naver-links">
+      <a
+        className="directions-card__button directions-card__button--naver"
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        네이버 지도에서 길찾기
+      </a>
+      {webFallbackHref && (
+        <a
+          className="directions-card__button directions-card__button--secondary"
+          href={webFallbackHref}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          앱이 열리지 않으면 웹에서 확인
+        </a>
+      )}
+    </div>
   )
 }
 

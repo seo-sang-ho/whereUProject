@@ -935,6 +935,11 @@
   margin-top: 12px;
 }
 
+.directions-card__naver-links {
+  display: grid;
+  gap: 7px;
+}
+
 .directions-card__button {
   width: 100%;
   min-height: 40px;
