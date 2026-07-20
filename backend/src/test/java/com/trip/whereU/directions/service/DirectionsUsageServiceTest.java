@@ -12,6 +12,7 @@ import com.trip.whereU.directions.config.NaverDirectionsProperties;
 import com.trip.whereU.directions.entity.NaverDirectionsMonthlyUsage;
 import com.trip.whereU.directions.repository.NaverDirectionsMonthlyUsageRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -53,7 +54,7 @@ class DirectionsUsageServiceTest {
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(Instant.parse("2026-07-20T00:00:00Z"), ZoneId.of("Asia/Seoul"));
-		NaverDirectionsProperties properties = new NaverDirectionsProperties("https://example.test", 50_000, 60, 1_000);
+		NaverDirectionsProperties properties = properties();
 		service = new DirectionsUsageService(
 				repository,
 				properties,
@@ -101,7 +102,7 @@ class DirectionsUsageServiceTest {
 		ZoneId koreaZone = ZoneId.of("Asia/Seoul");
 		Clock utcClock = Clock.fixed(utcMonthBoundary, ZoneOffset.UTC);
 		Clock koreanClock = Clock.fixed(utcMonthBoundary, koreaZone);
-		NaverDirectionsProperties properties = new NaverDirectionsProperties("https://example.test", 50_000, 60, 1_000);
+		NaverDirectionsProperties properties = properties();
 
 		try (MockedStatic<Clock> clock = Mockito.mockStatic(Clock.class)) {
 			clock.when(Clock::systemDefaultZone).thenReturn(utcClock);
@@ -161,5 +162,16 @@ class DirectionsUsageServiceTest {
 
 	private void executeWithoutResult(Consumer<TransactionStatus> callback) {
 		callback.accept(new SimpleTransactionStatus());
+	}
+
+	private NaverDirectionsProperties properties() {
+		return new NaverDirectionsProperties(
+				"https://example.test",
+				Duration.ofSeconds(3),
+				Duration.ofSeconds(7),
+				50_000,
+				60,
+				1_000
+		);
 	}
 }

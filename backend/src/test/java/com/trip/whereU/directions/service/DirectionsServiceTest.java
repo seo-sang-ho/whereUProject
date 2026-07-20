@@ -19,6 +19,7 @@ import com.trip.whereU.directions.dto.NaverDirectionsResult;
 import com.trip.whereU.directions.exception.DirectionsDestinationNotFoundException;
 import com.trip.whereU.tourism.entity.TourismContent;
 import com.trip.whereU.tourism.repository.TourismContentRepository;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -212,7 +213,14 @@ class DirectionsServiceTest {
 				tourismContentRepository,
 				usageService,
 				client,
-				new NaverDirectionsProperties("https://example.com", 50_000, 10, 100)
+				new NaverDirectionsProperties(
+						"https://example.com",
+						Duration.ofSeconds(3),
+						Duration.ofSeconds(7),
+						50_000,
+						10,
+						100
+				)
 		);
 	}
 

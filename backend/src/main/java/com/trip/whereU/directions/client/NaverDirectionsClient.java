@@ -4,9 +4,11 @@ import com.trip.whereU.directions.config.NaverDirectionsProperties;
 import com.trip.whereU.directions.dto.NaverDirectionsResult;
 import com.trip.whereU.map.config.NaverMapsProperties;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -31,7 +33,12 @@ public class NaverDirectionsClient {
 		this.mapsProperties = mapsProperties;
 		this.directionsProperties = directionsProperties;
 		this.objectMapper = objectMapper;
-		this.restClient = RestClient.create();
+		HttpClient httpClient = HttpClient.newBuilder()
+				.connectTimeout(directionsProperties.directionsConnectTimeout())
+				.build();
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+		requestFactory.setReadTimeout(directionsProperties.directionsReadTimeout());
+		this.restClient = RestClient.builder().requestFactory(requestFactory).build();
 	}
 
 	public Optional<NaverDirectionsResult> getDrivingEstimate(
