@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -40,14 +41,18 @@ public class NaverDirectionsClient {
 			double destinationLongitude
 	) {
 		validateProperties();
-		String responseBody = restClient.get()
-				.uri(buildDirectionsUri(originLatitude, originLongitude, destinationLatitude, destinationLongitude))
-				.header("x-ncp-apigw-api-key-id", mapsProperties.apiKeyId())
-				.header("x-ncp-apigw-api-key", mapsProperties.apiKey())
-				.accept(MediaType.APPLICATION_JSON)
-				.retrieve()
-				.body(String.class);
-		return parseResult(responseBody);
+		try {
+			String responseBody = restClient.get()
+					.uri(buildDirectionsUri(originLatitude, originLongitude, destinationLatitude, destinationLongitude))
+					.header("x-ncp-apigw-api-key-id", mapsProperties.apiKeyId())
+					.header("x-ncp-apigw-api-key", mapsProperties.apiKey())
+					.accept(MediaType.APPLICATION_JSON)
+					.retrieve()
+					.body(String.class);
+			return parseResult(responseBody);
+		} catch (RestClientException exception) {
+			throw new IllegalStateException("Naver Directions API 호출에 실패했습니다.");
+		}
 	}
 
 	URI buildDirectionsUri(
