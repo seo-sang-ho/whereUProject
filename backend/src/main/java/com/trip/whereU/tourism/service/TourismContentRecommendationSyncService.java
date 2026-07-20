@@ -58,7 +58,8 @@ public class TourismContentRecommendationSyncService {
 			int limit,
 			int pageSize
 	) {
-		ValueRecommendationResponse recommendations = valueRecommendationService.getLatestValueRecommendations(limit);
+		ValueRecommendationResponse recommendations =
+				valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(limit);
 		return syncRegions(
 				recommendations.recommendations().stream()
 						.map(RecommendationRegion::from)
@@ -83,7 +84,7 @@ public class TourismContentRecommendationSyncService {
 			int pageSize
 	) {
 		PersonalizedRecommendationResponse recommendations =
-				personalizedRecommendationService.getLatestRecommendations(themes, limit);
+				personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(themes, limit);
 		return syncRegions(
 				recommendations.recommendations().stream()
 						.map(RecommendationRegion::from)
@@ -253,14 +254,15 @@ public class TourismContentRecommendationSyncService {
 
 	private List<RecommendationRegion> findRecommendationCandidateRegions(List<TourismTheme> themes, int limit) {
 		List<RecommendationRegion> candidates = new ArrayList<>();
-		ValueRecommendationResponse valueRecommendations = valueRecommendationService.getLatestValueRecommendations(limit);
+		ValueRecommendationResponse valueRecommendations =
+				valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(limit);
 		candidates.addAll(valueRecommendations.recommendations().stream()
 				.map(RecommendationRegion::from)
 				.toList());
 
 		for (TourismTheme theme : normalizeCandidateThemes(themes)) {
 			PersonalizedRecommendationResponse personalizedRecommendations =
-					personalizedRecommendationService.getLatestRecommendations(List.of(theme), limit);
+					personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(theme), limit);
 			candidates.addAll(personalizedRecommendations.recommendations().stream()
 					.map(RecommendationRegion::from)
 					.toList());

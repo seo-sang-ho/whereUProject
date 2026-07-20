@@ -1,6 +1,7 @@
 package com.trip.whereU.tourism.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,7 +43,7 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Test
 	void syncsTourismContentsForValueRecommendationTopRegions() {
-		when(valueRecommendationService.getLatestValueRecommendations(2))
+		when(valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(2))
 				.thenReturn(ValueRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(
@@ -71,7 +72,7 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Test
 	void explicitMappingOverridesDerivedLegalDongCodeAndDefaultCategory() {
-		when(valueRecommendationService.getLatestValueRecommendations(1))
+		when(valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(1))
 				.thenReturn(ValueRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(recommendation(1, "26-26380", "부산광역시 사하구"))
@@ -97,7 +98,7 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Test
 	void syncsTourismContentsForPersonalizedRecommendationTopRegions() {
-		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+		when(personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.NATURE), 2))
 				.thenReturn(PersonalizedRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(TourismTheme.NATURE),
@@ -134,7 +135,7 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Test
 	void syncsTourismContentsForRecommendationCandidateRegionsWithoutDuplicates() {
-		when(valueRecommendationService.getLatestValueRecommendations(2))
+		when(valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(2))
 				.thenReturn(ValueRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(
@@ -142,7 +143,7 @@ class TourismContentRecommendationSyncServiceTest {
 								recommendation(2, "28-28110", "인천광역시 중구")
 						)
 				));
-		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+		when(personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.NATURE), 2))
 				.thenReturn(PersonalizedRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(TourismTheme.NATURE),
@@ -151,7 +152,7 @@ class TourismContentRecommendationSyncServiceTest {
 								personalizedRecommendation(2, "26-26380", "부산광역시 사하구")
 						)
 				));
-		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.FOOD), 2))
+		when(personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.FOOD), 2))
 				.thenReturn(PersonalizedRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(TourismTheme.FOOD),
@@ -195,7 +196,7 @@ class TourismContentRecommendationSyncServiceTest {
 
 	@Test
 	void reportsRecommendationCandidateImageStatus() {
-		when(valueRecommendationService.getLatestValueRecommendations(2))
+		when(valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(2))
 				.thenReturn(ValueRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(
@@ -203,7 +204,7 @@ class TourismContentRecommendationSyncServiceTest {
 								recommendation(2, "28-28110", "인천광역시 중구")
 						)
 				));
-		when(personalizedRecommendationService.getLatestRecommendations(List.of(TourismTheme.NATURE), 2))
+		when(personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.NATURE), 2))
 				.thenReturn(PersonalizedRecommendationResponse.of(
 						LocalDate.of(2025, 9, 1),
 						List.of(TourismTheme.NATURE),
@@ -236,6 +237,27 @@ class TourismContentRecommendationSyncServiceTest {
 		assertThat(response.results())
 				.extracting(TourismContentRecommendationImageStatusResponse.RegionImageStatus::legalDongCode)
 				.containsExactly("11-680", "28-110", "26-380");
+	}
+
+	@Test
+	void imageStatusDoesNotUseRecommendationLookupThatRequestsBackfill() {
+		when(valueRecommendationService.getLatestValueRecommendationsWithoutBackfill(1))
+				.thenReturn(ValueRecommendationResponse.of(
+						LocalDate.of(2025, 9, 1),
+						List.of(recommendation(1, "11-11680", "서울특별시 강남구"))
+				));
+		when(personalizedRecommendationService.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.NATURE), 1))
+				.thenReturn(PersonalizedRecommendationResponse.empty(List.of(TourismTheme.NATURE)));
+		when(mappingRepository.findByEnabledTrueAndRegionCodeIn(List.of("11-11680")))
+				.thenReturn(List.of());
+		when(tourismContentRepository.findByLegalDongCodeIn(List.of("11-680")))
+				.thenReturn(List.of());
+
+		service().findRecommendationCandidateImageStatus(List.of(TourismTheme.NATURE), 1);
+
+		verify(valueRecommendationService, never()).getLatestValueRecommendations(1);
+		verify(personalizedRecommendationService, never())
+				.getLatestRecommendations(List.of(TourismTheme.NATURE), 1);
 	}
 
 	private TourismContentRecommendationSyncService service() {

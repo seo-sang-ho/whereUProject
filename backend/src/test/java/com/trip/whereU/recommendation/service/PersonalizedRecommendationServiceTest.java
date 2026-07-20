@@ -2,6 +2,7 @@ package com.trip.whereU.recommendation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,6 +126,33 @@ class PersonalizedRecommendationServiceTest {
 
 		assertThat(response.referenceDate()).isEqualTo(referenceDate);
 		assertThat(response.recommendations()).isEmpty();
+	}
+
+	@Test
+	void internalRecommendationLookupDoesNotRequestBackfill() {
+		LocalDate referenceDate = LocalDate.of(2025, 9, 1);
+		when(resourceDemandRepository.findReferenceDatesByThemeDescending(TourismTheme.NATURE))
+				.thenReturn(List.of(referenceDate));
+		when(stayStrengthRepository.findReferenceDatesDescending()).thenReturn(List.of(referenceDate));
+		when(resourceDemandRepository.findByReferenceDateAndThemeIn(
+				referenceDate,
+				List.of(TourismTheme.NATURE)
+		)).thenReturn(List.of(
+				demand("11-11110", "종로구", "1205", 0.8, referenceDate)
+		));
+		when(stayStrengthRepository.findByReferenceDate(referenceDate)).thenReturn(List.of(
+				stayStrength("11-11110", "종로구", 0.2, referenceDate)
+		));
+		when(regionRepository.findAll()).thenReturn(List.of());
+		when(recommendationTourismContentService.findContentsByRegionCodes(List.of("11-11110"), 3))
+				.thenReturn(java.util.Map.of());
+
+		PersonalizedRecommendationResponse response = service()
+				.getLatestRecommendationsWithoutBackfill(List.of(TourismTheme.NATURE), 10);
+
+		assertThat(response.count()).isEqualTo(1);
+		verify(tourismContentBackfillService, never())
+				.requestBackfillForMissingImages(List.of("11-11110"), java.util.Map.of());
 	}
 
 	@Test

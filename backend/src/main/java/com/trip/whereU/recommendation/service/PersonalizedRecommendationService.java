@@ -61,6 +61,22 @@ public class PersonalizedRecommendationService {
 			List<TourismTheme> requestedThemes,
 			int limit
 	) {
+		return getLatestRecommendations(requestedThemes, limit, true);
+	}
+
+	@Transactional(readOnly = true)
+	public PersonalizedRecommendationResponse getLatestRecommendationsWithoutBackfill(
+			List<TourismTheme> requestedThemes,
+			int limit
+	) {
+		return getLatestRecommendations(requestedThemes, limit, false);
+	}
+
+	private PersonalizedRecommendationResponse getLatestRecommendations(
+			List<TourismTheme> requestedThemes,
+			int limit,
+			boolean requestBackfill
+	) {
 		List<TourismTheme> themes = normalizeThemes(requestedThemes);
 		validateLimit(limit);
 		Optional<LocalDate> commonReferenceDate = findLatestCommonReferenceDate(themes);
@@ -103,7 +119,9 @@ public class PersonalizedRecommendationService {
 						regionCodes,
 						TOURISM_CONTENT_LIMIT_PER_REGION
 				);
-		tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
+		if (requestBackfill) {
+			tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
+		}
 
 		List<PersonalizedRecommendationItemResponse> recommendations = java.util.stream.IntStream
 				.range(0, candidates.size())

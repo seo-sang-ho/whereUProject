@@ -52,6 +52,15 @@ public class ValueRecommendationService {
 
 	@Transactional(readOnly = true)
 	public ValueRecommendationResponse getLatestValueRecommendations(int limit) {
+		return getLatestValueRecommendations(limit, true);
+	}
+
+	@Transactional(readOnly = true)
+	public ValueRecommendationResponse getLatestValueRecommendationsWithoutBackfill(int limit) {
+		return getLatestValueRecommendations(limit, false);
+	}
+
+	private ValueRecommendationResponse getLatestValueRecommendations(int limit, boolean requestBackfill) {
 		validateLimit(limit);
 		Optional<LocalDate> commonReferenceDate = findLatestCommonReferenceDate();
 		if (commonReferenceDate.isEmpty()) {
@@ -87,7 +96,9 @@ public class ValueRecommendationService {
 						regionCodes,
 						TOURISM_CONTENT_LIMIT_PER_REGION
 				);
-		tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
+		if (requestBackfill) {
+			tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
+		}
 
 		List<ValueRecommendationItemResponse> recommendations = java.util.stream.IntStream
 				.range(0, candidates.size())
