@@ -5,6 +5,7 @@ import com.trip.whereU.directions.entity.NaverDirectionsMonthlyUsage;
 import com.trip.whereU.directions.repository.NaverDirectionsMonthlyUsageRepository;
 import java.time.Clock;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class DirectionsUsageService {
 
 	private static final int RESERVATION_ATTEMPTS = 2;
+	private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
 	private final NaverDirectionsMonthlyUsageRepository repository;
 	private final long safeLimit;
@@ -32,7 +34,7 @@ public class DirectionsUsageService {
 		this(
 				repository,
 				properties,
-				Clock.systemDefaultZone(),
+				Clock.system(KOREA_ZONE),
 				new TransactionTemplate(transactionManager),
 				newRequiresNewTransactionTemplate(transactionManager)
 		);

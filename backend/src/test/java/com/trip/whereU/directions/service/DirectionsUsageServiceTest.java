@@ -14,13 +14,17 @@ import com.trip.whereU.directions.repository.NaverDirectionsMonthlyUsageReposito
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -40,6 +44,9 @@ class DirectionsUsageServiceTest {
 
 	@Mock
 	private TransactionTemplate requiresNewTransactionTemplate;
+
+	@Mock
+	private PlatformTransactionManager transactionManager;
 
 	private DirectionsUsageService service;
 
@@ -86,6 +93,24 @@ class DirectionsUsageServiceTest {
 		assertThat(service.isCurrentMonthAvailable()).isTrue();
 
 		then(repository).should(never()).save(any());
+	}
+
+	@Test
+	void productionClockUsesKoreanMonthAtUtcMonthBoundary() {
+		Instant utcMonthBoundary = Instant.parse("2026-07-31T15:00:00Z");
+		ZoneId koreaZone = ZoneId.of("Asia/Seoul");
+		Clock utcClock = Clock.fixed(utcMonthBoundary, ZoneOffset.UTC);
+		Clock koreanClock = Clock.fixed(utcMonthBoundary, koreaZone);
+		NaverDirectionsProperties properties = new NaverDirectionsProperties("https://example.test", 50_000, 60, 1_000);
+
+		try (MockedStatic<Clock> clock = Mockito.mockStatic(Clock.class)) {
+			clock.when(Clock::systemDefaultZone).thenReturn(utcClock);
+			clock.when(() -> Clock.system(koreaZone)).thenReturn(koreanClock);
+
+			new DirectionsUsageService(repository, properties, transactionManager).isCurrentMonthAvailable();
+		}
+
+		then(repository).should().findById("2026-08");
 	}
 
 	@Test
