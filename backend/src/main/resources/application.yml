@@ -35,5 +35,9 @@ tourism:
 naver:
   maps:
     geocoding-base-url: ${NAVER_MAPS_GEOCODING_BASE_URL:https://maps.apigw.ntruss.com/map-geocode/v2/geocode}
+    directions-base-url: ${NAVER_MAPS_DIRECTIONS_BASE_URL:https://maps.apigw.ntruss.com/map-direction/v1/driving}
+    directions-monthly-safe-limit: ${NAVER_DIRECTIONS_MONTHLY_SAFE_LIMIT:50000}
+    directions-cache-ttl-minutes: ${NAVER_DIRECTIONS_CACHE_TTL_MINUTES:10}
+    directions-cache-maximum-size: ${NAVER_DIRECTIONS_CACHE_MAXIMUM_SIZE:10000}
     api-key-id: ${NAVER_MAPS_API_KEY_ID:}
     api-key: ${NAVER_MAPS_API_KEY:}
