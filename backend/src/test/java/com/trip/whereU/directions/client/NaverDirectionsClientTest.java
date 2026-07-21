@@ -38,12 +38,12 @@ class NaverDirectionsClientTest {
 		Optional<NaverDirectionsResult> result = client().parseResult("""
 				{"code":0,"route":{"traoptimal":[{"summary":{
 				  "distance":84200,"duration":4470001,"tollFare":3200,
-				  "departureTime":"2026-07-20T15:00:00+09:00"
+				  "departureTime":"2026-07-21T10:03:10"
 				}}]}}
 				""");
 
 		assertThat(result).contains(new NaverDirectionsResult(
-				75, 84200, 3200, OffsetDateTime.parse("2026-07-20T15:00:00+09:00")
+				75, 84200, 3200, OffsetDateTime.parse("2026-07-21T10:03:10+09:00")
 		));
 	}
 

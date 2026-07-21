@@ -5,7 +5,9 @@ import com.trip.whereU.directions.dto.NaverDirectionsResult;
 import com.trip.whereU.map.config.NaverMapsProperties;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -19,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class NaverDirectionsClient {
+	private static final ZoneId NAVER_DIRECTIONS_ZONE = ZoneId.of("Asia/Seoul");
 
 	private final NaverMapsProperties mapsProperties;
 	private final NaverDirectionsProperties directionsProperties;
@@ -98,11 +101,17 @@ public class NaverDirectionsClient {
 					(int) ((durationMillis + 59_999) / 60_000),
 					summary.path("distance").asLong(),
 					summary.path("tollFare").asInt(),
-					OffsetDateTime.parse(summary.path("departureTime").asText())
+					parseDepartureTime(summary.path("departureTime").asText())
 			));
 		} catch (Exception exception) {
 			throw new IllegalStateException("Naver Directions API 응답을 해석하지 못했습니다.", exception);
 		}
+	}
+
+	private OffsetDateTime parseDepartureTime(String departureTime) {
+		return LocalDateTime.parse(departureTime)
+				.atZone(NAVER_DIRECTIONS_ZONE)
+				.toOffsetDateTime();
 	}
 
 	private void validateProperties() {
