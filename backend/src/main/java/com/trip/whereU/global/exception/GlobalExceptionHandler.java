@@ -1,16 +1,32 @@
 package com.trip.whereU.global.exception;
 
+import com.trip.whereU.directions.exception.DirectionsDestinationNotFoundException;
 import com.trip.whereU.global.dto.ApiResponse;
 import com.trip.whereU.resourcedemand.exception.ResourceDemandSyncAlreadyRunningException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	@ExceptionHandler(DirectionsDestinationNotFoundException.class)
+	public ResponseEntity<ApiResponse<Void>> handleDirectionsDestinationNotFound(
+			DirectionsDestinationNotFoundException exception
+	) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(ApiResponse.failure(exception.getMessage()));
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid() {
+		return ResponseEntity.badRequest()
+				.body(ApiResponse.failure("요청 값이 올바르지 않습니다."));
+	}
 
 	@ExceptionHandler(ResourceDemandSyncAlreadyRunningException.class)
 	public ResponseEntity<ApiResponse<Void>> handleSyncAlreadyRunning(

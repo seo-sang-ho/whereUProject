@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import Supercluster from 'supercluster'
+import { RecommendationDirectionsCard } from './components/RecommendationDirectionsCard'
 import { useLatestStayStrengths } from './hooks/useLatestStayStrengths'
 import { usePersonalizedRecommendations } from './hooks/usePersonalizedRecommendations'
 import { useValueRecommendations } from './hooks/useValueRecommendations'
+import { calculateDirectionsCardTop } from './lib/directionsCardPosition'
 import { loadNaverMaps } from './lib/naverMaps'
 import type { PersonalizedRecommendation, TourismTheme } from './types/personalizedRecommendation'
 import type { GeoBounds, StayStrengthLevel, StayStrengthRegion } from './types/stayStrength'
@@ -13,6 +15,14 @@ type MapStatus = 'loading' | 'ready' | 'missing-key' | 'error'
 type MapMode = 'strength' | 'recommendation' | 'personalized'
 
 type MapRecommendation = ValueRecommendation | PersonalizedRecommendation
+
+interface TourismCardPreview {
+  title: string
+  address: string
+  imageUrl: string | null
+  placeholderLabel: string
+  isFallback: boolean
+}
 
 interface MapOverlay {
   marker: naver.maps.Marker
@@ -29,6 +39,8 @@ type ClusterMapFeature =
 
 const naverMapClientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID?.trim()
 const nationwideCenter = { latitude: 36.35, longitude: 127.8 }
+const mobileDirectionsMediaQuery = '(max-width: 760px)'
+const directionsCardGap = 20
 
 const stayStrengthLevels = [
   { level: 'LOW', label: '낮음', className: 'low' },
@@ -72,6 +84,49 @@ function formatReferenceMonth(referenceDate: string | null | undefined): string 
   return `${year}.${month} 기준`
 }
 
+function buildTourismCardPreview(recommendation: MapRecommendation): TourismCardPreview {
+  const primaryTourismContent = recommendation.tourismContents[0]
+  if (primaryTourismContent) {
+    return {
+      title: primaryTourismContent.title,
+      address: primaryTourismContent.address ?? recommendation.regionName,
+      imageUrl: primaryTourismContent.firstImage,
+      placeholderLabel: primaryTourismContent.title.slice(0, 1),
+      isFallback: false,
+    }
+  }
+
+  return {
+    title: recommendation.regionName,
+    address: '추천 지역 관광정보 준비 중',
+    imageUrl: null,
+    placeholderLabel: recommendation.regionName.slice(0, 1),
+    isFallback: true,
+  }
+}
+
+function renderTourismCardPreview(preview: TourismCardPreview) {
+  return (
+    <span className={preview.isFallback ? 'tourism-card-preview is-fallback' : 'tourism-card-preview'}>
+      {preview.imageUrl ? (
+        <img
+          src={preview.imageUrl}
+          alt=""
+          loading="lazy"
+        />
+      ) : (
+        <span className="tourism-card-placeholder">
+          {preview.placeholderLabel}
+        </span>
+      )}
+      <span className="tourism-card-copy">
+        <strong>{preview.title}</strong>
+        <span>{preview.address}</span>
+      </span>
+    </span>
+  )
+}
+
 function isClusterFeature(
   feature: ClusterMapFeature,
 ): feature is Supercluster.ClusterFeature<Record<string, never>> {
@@ -80,6 +135,10 @@ function isClusterFeature(
 
 function App() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapWorkspaceRef = useRef<HTMLElement>(null)
+  const recommendationPanelRef = useRef<HTMLElement>(null)
+  const selectedRecommendationRef = useRef<HTMLButtonElement>(null)
+  const directionsCardRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<naver.maps.Map | null>(null)
   const overlaysRef = useRef<MapOverlay[]>([])
   const [mapStatus, setMapStatus] = useState<MapStatus>(
@@ -90,6 +149,10 @@ function App() {
   const [selectedRegion, setSelectedRegion] = useState<StayStrengthRegion | null>(null)
   const [selectedRecommendationCode, setSelectedRecommendationCode] = useState<string | null>(null)
   const [selectedThemes, setSelectedThemes] = useState<TourismTheme[]>(['NATURE'])
+  const [directionsCardTop, setDirectionsCardTop] = useState(directionsCardGap)
+  const [mobileInline, setMobileInline] = useState(
+    () => window.matchMedia(mobileDirectionsMediaQuery).matches,
+  )
   const stayStrengthQuery = useLatestStayStrengths(mapMode === 'strength' ? bounds : null)
   const recommendationQuery = useValueRecommendations(mapMode === 'recommendation')
   const personalizedQuery = usePersonalizedRecommendations(
@@ -314,11 +377,79 @@ function App() {
   const visibleCount = stayStrengthQuery.data?.stayStrengths.length ?? 0
   const recommendations = recommendationQuery.data?.recommendations ?? []
   const personalizedRecommendations = personalizedQuery.data?.recommendations ?? []
+  const activeRecommendations: MapRecommendation[] = mapMode === 'personalized'
+    ? personalizedRecommendations
+    : mapMode === 'recommendation'
+      ? recommendations
+      : []
+  const selectedRecommendation = activeRecommendations.find(
+    (recommendation) => recommendation.regionCode === selectedRecommendationCode,
+  )
+  const directionsDestination = selectedRecommendation?.tourismContents[0] ?? null
   const hasDataError = mapMode === 'strength'
     ? stayStrengthQuery.isError
     : mapMode === 'personalized'
       ? personalizedQuery.isError
       : recommendationQuery.isError
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(mobileDirectionsMediaQuery)
+    const updateLayout = () => setMobileInline(mediaQuery.matches)
+
+    updateLayout()
+    mediaQuery.addEventListener('change', updateLayout)
+
+    return () => mediaQuery.removeEventListener('change', updateLayout)
+  }, [])
+
+  useEffect(() => {
+    if (!selectedRecommendationCode) {
+      return
+    }
+
+    selectedRecommendationRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selectedRecommendationCode])
+
+  useEffect(() => {
+    const workspace = mapWorkspaceRef.current
+    const panel = recommendationPanelRef.current
+    const selectedCard = selectedRecommendationRef.current
+    const directionsCard = directionsCardRef.current
+
+    if (mobileInline || !directionsDestination || !workspace || !panel || !selectedCard || !directionsCard) {
+      return
+    }
+
+    const updatePosition = () => {
+      const workspaceRect = workspace.getBoundingClientRect()
+      const selectedRect = selectedCard.getBoundingClientRect()
+      const directionsCardRect = directionsCard.getBoundingClientRect()
+
+      setDirectionsCardTop(calculateDirectionsCardTop({
+        selectedTop: selectedRect.top,
+        workspaceTop: workspaceRect.top,
+        workspaceHeight: workspaceRect.height,
+        cardHeight: directionsCardRect.height,
+        gap: directionsCardGap,
+      }))
+    }
+
+    updatePosition()
+    panel.addEventListener('scroll', updatePosition)
+    window.addEventListener('resize', updatePosition)
+
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updatePosition)
+    resizeObserver?.observe(selectedCard)
+    resizeObserver?.observe(directionsCard)
+
+    return () => {
+      panel.removeEventListener('scroll', updatePosition)
+      window.removeEventListener('resize', updatePosition)
+      resizeObserver?.disconnect()
+    }
+  }, [directionsDestination, mobileInline, selectedRecommendationCode])
 
   return (
     <main className="app-shell">
@@ -338,10 +469,13 @@ function App() {
         <span className="data-source">한국관광공사 데이터</span>
       </header>
 
-      <section className="map-workspace" aria-label="관광 데이터 지도">
+      <section ref={mapWorkspaceRef} className="map-workspace" aria-label="관광 데이터 지도">
         <div ref={mapContainerRef} className="map-canvas" />
 
-        <aside className={`map-panel${mapMode !== 'strength' ? ' map-panel--recommendation' : ''}`}>
+        <aside
+          ref={recommendationPanelRef}
+          className={`map-panel${mapMode !== 'strength' ? ' map-panel--recommendation' : ''}`}
+        >
           <div className="map-mode-tabs" role="tablist" aria-label="지도 데이터 선택">
             <button
               type="button"
@@ -432,10 +566,11 @@ function App() {
               <ol className="recommendation-list" aria-label="가성비 여행지 추천 순위">
                 {recommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
-                  const primaryTourismContent = recommendation.tourismContents[0]
+                  const tourismCardPreview = buildTourismCardPreview(recommendation)
                   return (
                     <li key={recommendation.regionCode}>
                       <button
+                        ref={selected ? selectedRecommendationRef : null}
                         type="button"
                         className={selected ? 'recommendation-item is-selected' : 'recommendation-item'}
                         aria-pressed={selected}
@@ -450,25 +585,7 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
-                        {primaryTourismContent && (
-                          <span className="tourism-card-preview">
-                            {primaryTourismContent.firstImage ? (
-                              <img
-                                src={primaryTourismContent.firstImage}
-                                alt=""
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span className="tourism-card-placeholder">
-                                {primaryTourismContent.title.slice(0, 1)}
-                              </span>
-                            )}
-                            <span className="tourism-card-copy">
-                              <strong>{primaryTourismContent.title}</strong>
-                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
-                            </span>
-                          </span>
-                        )}
+                        {renderTourismCardPreview(tourismCardPreview)}
                         {selected && (
                           <span className="recommendation-metrics">
                             <span>서비스 수요 <b>{Math.round(recommendation.normalizedServiceDemand * 100)}</b></span>
@@ -476,6 +593,16 @@ function App() {
                           </span>
                         )}
                       </button>
+                      {selected && directionsDestination && mobileInline && (
+                        <div className="recommendation-directions-inline">
+                          <RecommendationDirectionsCard
+                            key={directionsDestination.contentId}
+                            destination={directionsDestination}
+                            mobileInline
+                            onClose={() => setSelectedRecommendationCode(null)}
+                          />
+                        </div>
+                      )}
                     </li>
                   )
                 })}
@@ -515,10 +642,11 @@ function App() {
               <ol className="recommendation-list" aria-label="개인 맞춤 여행지 추천 순위">
                 {personalizedRecommendations.map((recommendation) => {
                   const selected = recommendation.regionCode === selectedRecommendationCode
-                  const primaryTourismContent = recommendation.tourismContents[0]
+                  const tourismCardPreview = buildTourismCardPreview(recommendation)
                   return (
                     <li key={recommendation.regionCode}>
                       <button
+                        ref={selected ? selectedRecommendationRef : null}
                         type="button"
                         className={selected ? 'recommendation-item is-selected' : 'recommendation-item'}
                         aria-pressed={selected}
@@ -533,25 +661,7 @@ function App() {
                           {recommendation.recommendationScorePercent}
                           <small>점</small>
                         </span>
-                        {primaryTourismContent && (
-                          <span className="tourism-card-preview">
-                            {primaryTourismContent.firstImage ? (
-                              <img
-                                src={primaryTourismContent.firstImage}
-                                alt=""
-                                loading="lazy"
-                              />
-                            ) : (
-                              <span className="tourism-card-placeholder">
-                                {primaryTourismContent.title.slice(0, 1)}
-                              </span>
-                            )}
-                            <span className="tourism-card-copy">
-                              <strong>{primaryTourismContent.title}</strong>
-                              <span>{primaryTourismContent.address ?? recommendation.regionName}</span>
-                            </span>
-                          </span>
-                        )}
+                        {renderTourismCardPreview(tourismCardPreview)}
                         {selected && (
                           <span className="personalized-detail">
                             <span className="recommendation-metrics">
@@ -568,6 +678,16 @@ function App() {
                           </span>
                         )}
                       </button>
+                      {selected && directionsDestination && mobileInline && (
+                        <div className="recommendation-directions-inline">
+                          <RecommendationDirectionsCard
+                            key={directionsDestination.contentId}
+                            destination={directionsDestination}
+                            mobileInline
+                            onClose={() => setSelectedRecommendationCode(null)}
+                          />
+                        </div>
+                      )}
                     </li>
                   )
                 })}
@@ -594,6 +714,21 @@ function App() {
             </div>
           )}
         </aside>
+
+        {directionsDestination && !mobileInline && (
+          <div
+            ref={directionsCardRef}
+            className="directions-card-overlay"
+            style={{ top: directionsCardTop }}
+          >
+            <RecommendationDirectionsCard
+              key={directionsDestination.contentId}
+              destination={directionsDestination}
+              mobileInline={false}
+              onClose={() => setSelectedRecommendationCode(null)}
+            />
+          </div>
+        )}
 
         {hasDataError && mapStatus === 'ready' && (
           <div className="data-error" role="alert">

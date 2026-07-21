@@ -8,3 +8,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+
+naver:
+  maps:
+    directions-connect-timeout: 3s
+    directions-read-timeout: 7s
+    directions-monthly-safe-limit: 50000

@@ -1,13 +1,17 @@
 package com.trip.whereU.tourism.controller;
 
 import com.trip.whereU.global.dto.ApiResponse;
+import com.trip.whereU.resourcedemand.entity.TourismTheme;
+import com.trip.whereU.tourism.dto.TourismContentRecommendationImageStatusResponse;
 import com.trip.whereU.tourism.dto.TourismContentRecommendationTopSyncResponse;
 import com.trip.whereU.tourism.service.TourismContentRecommendationSyncService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -56,6 +60,84 @@ public class TourismContentAdminController {
 						limit,
 						pageSize
 				)
+		));
+	}
+
+	@PostMapping("/sync/personalized-top")
+	public ResponseEntity<ApiResponse<TourismContentRecommendationTopSyncResponse>> syncPersonalizedTopRegions(
+			@RequestHeader(value = "X-Admin-Token", required = false) String requestAdminToken,
+			@RequestParam List<TourismTheme> themes,
+			@RequestParam(defaultValue = "10") int limit,
+			@RequestParam(defaultValue = "10") int pageSize,
+			@RequestParam(required = false) String contentTypeId,
+			@RequestParam(defaultValue = "C") String arrange,
+			@RequestParam(required = false) String lclsSystm1,
+			@RequestParam(required = false) String lclsSystm2,
+			@RequestParam(required = false) String lclsSystm3
+	) {
+		if (!isAuthorized(requestAdminToken)) {
+			return ResponseEntity
+					.status(HttpStatus.FORBIDDEN)
+					.body(ApiResponse.failure("관리자 토큰이 올바르지 않습니다."));
+		}
+		return ResponseEntity.ok(ApiResponse.success(
+				recommendationSyncService.syncPersonalizedRecommendationTopRegions(
+						themes,
+						contentTypeId,
+						arrange,
+						lclsSystm1,
+						lclsSystm2,
+						lclsSystm3,
+						limit,
+						pageSize
+				)
+		));
+	}
+
+	@PostMapping("/sync/recommendation-candidates")
+	public ResponseEntity<ApiResponse<TourismContentRecommendationTopSyncResponse>> syncRecommendationCandidateRegions(
+			@RequestHeader(value = "X-Admin-Token", required = false) String requestAdminToken,
+			@RequestParam(required = false) List<TourismTheme> themes,
+			@RequestParam(defaultValue = "100") int limit,
+			@RequestParam(defaultValue = "10") int pageSize,
+			@RequestParam(required = false) String contentTypeId,
+			@RequestParam(defaultValue = "C") String arrange,
+			@RequestParam(required = false) String lclsSystm1,
+			@RequestParam(required = false) String lclsSystm2,
+			@RequestParam(required = false) String lclsSystm3
+	) {
+		if (!isAuthorized(requestAdminToken)) {
+			return ResponseEntity
+					.status(HttpStatus.FORBIDDEN)
+					.body(ApiResponse.failure("관리자 토큰이 올바르지 않습니다."));
+		}
+		return ResponseEntity.ok(ApiResponse.success(
+				recommendationSyncService.syncRecommendationCandidateRegions(
+						themes,
+						contentTypeId,
+						arrange,
+						lclsSystm1,
+						lclsSystm2,
+						lclsSystm3,
+						limit,
+						pageSize
+				)
+		));
+	}
+
+	@GetMapping("/recommendation-candidates/image-status")
+	public ResponseEntity<ApiResponse<TourismContentRecommendationImageStatusResponse>> getRecommendationCandidateImageStatus(
+			@RequestHeader(value = "X-Admin-Token", required = false) String requestAdminToken,
+			@RequestParam(required = false) List<TourismTheme> themes,
+			@RequestParam(defaultValue = "100") int limit
+	) {
+		if (!isAuthorized(requestAdminToken)) {
+			return ResponseEntity
+					.status(HttpStatus.FORBIDDEN)
+					.body(ApiResponse.failure("관리자 토큰이 올바르지 않습니다."));
+		}
+		return ResponseEntity.ok(ApiResponse.success(
+				recommendationSyncService.findRecommendationCandidateImageStatus(themes, limit)
 		));
 	}
 

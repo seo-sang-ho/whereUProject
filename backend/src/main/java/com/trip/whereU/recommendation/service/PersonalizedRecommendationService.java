@@ -11,6 +11,7 @@ import com.trip.whereU.resourcedemand.entity.TourismTheme;
 import com.trip.whereU.resourcedemand.repository.TourismResourceDemandRepository;
 import com.trip.whereU.staystrength.entity.TourismStayStrength;
 import com.trip.whereU.staystrength.repository.TourismStayStrengthRepository;
+import com.trip.whereU.tourism.service.TourismContentBackfillService;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -39,23 +40,42 @@ public class PersonalizedRecommendationService {
 	private final TourismStayStrengthRepository stayStrengthRepository;
 	private final TourismRegionRepository regionRepository;
 	private final RecommendationTourismContentService recommendationTourismContentService;
+	private final TourismContentBackfillService tourismContentBackfillService;
 
 	public PersonalizedRecommendationService(
 			TourismResourceDemandRepository resourceDemandRepository,
 			TourismStayStrengthRepository stayStrengthRepository,
 			TourismRegionRepository regionRepository,
-			RecommendationTourismContentService recommendationTourismContentService
+			RecommendationTourismContentService recommendationTourismContentService,
+			TourismContentBackfillService tourismContentBackfillService
 	) {
 		this.resourceDemandRepository = resourceDemandRepository;
 		this.stayStrengthRepository = stayStrengthRepository;
 		this.regionRepository = regionRepository;
 		this.recommendationTourismContentService = recommendationTourismContentService;
+		this.tourismContentBackfillService = tourismContentBackfillService;
 	}
 
 	@Transactional(readOnly = true)
 	public PersonalizedRecommendationResponse getLatestRecommendations(
 			List<TourismTheme> requestedThemes,
 			int limit
+	) {
+		return getLatestRecommendations(requestedThemes, limit, true);
+	}
+
+	@Transactional(readOnly = true)
+	public PersonalizedRecommendationResponse getLatestRecommendationsWithoutBackfill(
+			List<TourismTheme> requestedThemes,
+			int limit
+	) {
+		return getLatestRecommendations(requestedThemes, limit, false);
+	}
+
+	private PersonalizedRecommendationResponse getLatestRecommendations(
+			List<TourismTheme> requestedThemes,
+			int limit,
+			boolean requestBackfill
 	) {
 		List<TourismTheme> themes = normalizeThemes(requestedThemes);
 		validateLimit(limit);
@@ -99,6 +119,9 @@ public class PersonalizedRecommendationService {
 						regionCodes,
 						TOURISM_CONTENT_LIMIT_PER_REGION
 				);
+		if (requestBackfill) {
+			tourismContentBackfillService.requestBackfillForMissingImages(regionCodes, tourismContentsByRegion);
+		}
 
 		List<PersonalizedRecommendationItemResponse> recommendations = java.util.stream.IntStream
 				.range(0, candidates.size())

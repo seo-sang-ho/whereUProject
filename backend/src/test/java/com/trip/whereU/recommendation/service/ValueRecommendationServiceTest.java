@@ -2,6 +2,8 @@ package com.trip.whereU.recommendation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.trip.whereU.map.entity.TourismRegion;
@@ -12,6 +14,7 @@ import com.trip.whereU.servicedemand.entity.TourismServiceDemand;
 import com.trip.whereU.servicedemand.repository.TourismServiceDemandRepository;
 import com.trip.whereU.staystrength.entity.TourismStayStrength;
 import com.trip.whereU.staystrength.repository.TourismStayStrengthRepository;
+import com.trip.whereU.tourism.service.TourismContentBackfillService;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,8 @@ class ValueRecommendationServiceTest {
 	private TourismRegionRepository regionRepository;
 	@Mock
 	private RecommendationTourismContentService recommendationTourismContentService;
+	@Mock
+	private TourismContentBackfillService tourismContentBackfillService;
 
 	@Test
 	void ranksHighServiceDemandAndLowStayStrengthFirstUsingLatestCommonMonth() {
@@ -70,6 +75,13 @@ class ValueRecommendationServiceTest {
 		assertThat(response.recommendations().getFirst().tourismContents())
 				.extracting(RecommendedTourismContentResponse::title)
 				.containsExactly("을숙도 공원");
+		verify(tourismContentBackfillService).requestBackfillForMissingImages(
+				List.of("11-11110", "11-11140"),
+				java.util.Map.of(
+						"11-11110",
+						List.of(tourismContent("127974", "을숙도 공원"))
+				)
+		);
 	}
 
 	@Test
@@ -87,6 +99,29 @@ class ValueRecommendationServiceTest {
 
 		assertThat(response.referenceDate()).isEqualTo(referenceDate);
 		assertThat(response.recommendations()).isEmpty();
+	}
+
+	@Test
+	void internalRecommendationLookupDoesNotRequestBackfill() {
+		LocalDate referenceDate = LocalDate.of(2025, 9, 1);
+		when(serviceDemandRepository.findReferenceDatesDescending()).thenReturn(List.of(referenceDate));
+		when(stayStrengthRepository.findReferenceDatesDescending()).thenReturn(List.of(referenceDate));
+		when(serviceDemandRepository.findByReferenceDate(referenceDate)).thenReturn(List.of(
+				serviceDemand("11-11110", "종로구", 0.9, referenceDate)
+		));
+		when(stayStrengthRepository.findByReferenceDate(referenceDate)).thenReturn(List.of(
+				stayStrength("11-11110", "종로구", 0.2, referenceDate)
+		));
+		when(regionRepository.findAll()).thenReturn(List.of());
+		when(recommendationTourismContentService.findContentsByRegionCodes(List.of("11-11110"), 3))
+				.thenReturn(java.util.Map.of());
+
+		ValueRecommendationResponse response = service()
+				.getLatestValueRecommendationsWithoutBackfill(10);
+
+		assertThat(response.count()).isEqualTo(1);
+		verify(tourismContentBackfillService, never())
+				.requestBackfillForMissingImages(List.of("11-11110"), java.util.Map.of());
 	}
 
 	@Test
@@ -111,7 +146,8 @@ class ValueRecommendationServiceTest {
 				serviceDemandRepository,
 				stayStrengthRepository,
 				regionRepository,
-				recommendationTourismContentService
+				recommendationTourismContentService,
+				tourismContentBackfillService
 		);
 	}
 
