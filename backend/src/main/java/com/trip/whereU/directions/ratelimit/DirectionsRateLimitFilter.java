@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
@@ -40,12 +41,8 @@ public class DirectionsRateLimitFilter extends OncePerRequestFilter {
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		String path = request.getServletPath();
-		if (path.isEmpty()) {
-			path = request.getRequestURI();
-		}
 		return !HttpMethod.POST.matches(request.getMethod())
-				|| !ESTIMATE_PATH.equals(path);
+				|| !ESTIMATE_PATH.equals(UrlPathHelper.defaultInstance.getPathWithinApplication(request));
 	}
 
 	@Override

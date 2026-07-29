@@ -123,6 +123,21 @@ class DirectionsControllerTest {
 		then(rateLimitService).should(times(1)).tryAcquire(anyString());
 	}
 
+	@Test
+	void rateLimitedMatrixParameterEstimateDoesNotReachController() throws Exception {
+		given(rateLimitService.tryAcquire(anyString())).willReturn(RateLimitDecision.rejected(6));
+
+		mockMvc.perform(post("/api/directions/estimate;x=y")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(validRequest()))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(header().string(HttpHeaders.RETRY_AFTER, "6"))
+				.andExpect(jsonPath("$.success").value(false));
+
+		then(directionsService).shouldHaveNoInteractions();
+		then(rateLimitService).should(times(1)).tryAcquire(anyString());
+	}
+
 	@ParameterizedTest
 	@MethodSource("invalidRequests")
 	void rejectsInvalidEstimateRequest(String requestBody) throws Exception {

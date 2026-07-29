@@ -75,12 +75,27 @@ class DirectionsRateLimitFilterTest {
 		assertThat(chain.getRequest()).isNotNull();
 	}
 
+	@Test
+	void rejectsEstimatePostWithMatrixParametersWithoutCallingDownstream() throws Exception {
+		given(rateLimitService.tryAcquire("203.0.113.10"))
+				.willReturn(RateLimitDecision.rejected(6));
+		MockHttpServletRequest request = estimateRequest("203.0.113.10");
+		request.setRequestURI("/api/directions/estimate;x=y");
+		request.setServletPath("/api/directions/estimate;x=y");
+
+		filter.doFilter(request, response, chain);
+
+		assertThat(response.getStatus()).isEqualTo(429);
+		assertThat(chain.getRequest()).isNull();
+	}
+
 	@ParameterizedTest
 	@CsvSource({
 			"GET, /api/directions/estimate",
 			"POST, /api/directions/availability",
 			"GET, /api/directions/availability",
-			"POST, /api/recommendations/personalized"
+			"POST, /api/recommendations/personalized",
+			"POST, /api/directions/estimate-extra;x=y"
 	})
 	void skipsEveryNonTargetMethodOrPath(String method, String path) throws Exception {
 		MockHttpServletRequest request = new MockHttpServletRequest(method, path);
