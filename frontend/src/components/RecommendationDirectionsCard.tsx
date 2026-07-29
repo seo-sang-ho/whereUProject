@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { DirectionsRateLimitError } from '../api/directionsApi'
 import { useDirectionsAvailability } from '../hooks/useDirectionsAvailability'
 import { useDrivingEstimate } from '../hooks/useDrivingEstimate'
 import {
@@ -28,6 +29,7 @@ type FallbackReason =
   | GeolocationErrorCode
   | 'AVAILABILITY'
   | 'DESTINATION_COORDINATES_MISSING'
+  | 'RATE_LIMIT'
   | 'ROUTE'
 
 interface DirectionsCardState {
@@ -132,14 +134,16 @@ function RecommendationDirectionsCardContent({
         origin,
         fallbackReason: 'ROUTE',
       })
-    } catch {
+    } catch (error) {
       if (!activeRef.current) {
         return
       }
       setState({
         phase: 'NAVER_MAP_REQUIRED',
         origin,
-        fallbackReason: 'ROUTE',
+        fallbackReason: error instanceof DirectionsRateLimitError
+          ? 'RATE_LIMIT'
+          : 'ROUTE',
       })
     }
   }
@@ -331,6 +335,8 @@ function fallbackMessage(reason: FallbackReason | undefined): string {
       return '현재 위치 확인 시간이 초과됐어요.'
     case 'DESTINATION_COORDINATES_MISSING':
       return '목적지 위치 정보가 없어 네이버 지도에서 장소를 검색해 주세요.'
+    case 'RATE_LIMIT':
+      return '요청이 많아 네이버 지도에서 길찾기를 계속해 주세요.'
     case 'ROUTE':
       return '자동차 예상 시간을 불러오지 못했어요.'
     default:

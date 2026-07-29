@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
+import { DirectionsRateLimitError } from '../api/directionsApi'
 import { GeolocationError } from '../lib/geolocation'
 import type { DirectionsEstimate } from '../types/directions'
 import type { RecommendedTourismContent } from '../types/tourismContent'
@@ -13,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   requestCurrentPosition: vi.fn(),
 }))
 
-vi.mock('../api/directionsApi', () => ({
+vi.mock('../api/directionsApi', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../api/directionsApi')>(),
   fetchDirectionsAvailability: mocks.fetchDirectionsAvailability,
   fetchDrivingEstimate: mocks.fetchDrivingEstimate,
 }))
@@ -161,6 +163,38 @@ describe('RecommendationDirectionsCard', () => {
     expect(await screen.findByText(/\uc704\uce58 \uad8c\ud55c/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '네이버 지도에서 길찾기' })).toBeInTheDocument()
+  })
+
+  it('429이면 재시도 없이 현재 위치를 포함한 네이버 지도 버튼을 보여준다', async () => {
+    mocks.fetchDirectionsAvailability.mockResolvedValue({ status: 'AVAILABLE' })
+    mocks.requestCurrentPosition.mockResolvedValue({ latitude: 37.5, longitude: 127 })
+    mocks.fetchDrivingEstimate.mockRejectedValue(new DirectionsRateLimitError(6))
+    const user = userEvent.setup()
+    renderCard()
+
+    await user.click(screen.getByRole('button', { name: '자동차 시간 확인' }))
+
+    expect(await screen.findByText('요청이 많아 네이버 지도에서 길찾기를 계속해 주세요.'))
+      .toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: '네이버 지도에서 길찾기' })
+    const url = new URL(link.getAttribute('href') ?? '')
+    expect(url.searchParams.get('slat')).toBe('37.5')
+    expect(url.searchParams.get('slng')).toBe('127')
+    expect(mocks.fetchDrivingEstimate).toHaveBeenCalledOnce()
+  })
+
+  it('일반 estimate 오류는 기존 경로 오류 문구를 유지한다', async () => {
+    mocks.fetchDirectionsAvailability.mockResolvedValue({ status: 'AVAILABLE' })
+    mocks.requestCurrentPosition.mockResolvedValue({ latitude: 37.5, longitude: 127 })
+    mocks.fetchDrivingEstimate.mockRejectedValue(new Error('network error'))
+    const user = userEvent.setup()
+    renderCard()
+
+    await user.click(screen.getByRole('button', { name: '자동차 시간 확인' }))
+
+    expect(await screen.findByText('자동차 예상 시간을 불러오지 못했어요.'))
+      .toBeInTheDocument()
   })
 
   it('목적지 contentId가 바뀌면 이전 예상 경로를 초기화한다', async () => {
