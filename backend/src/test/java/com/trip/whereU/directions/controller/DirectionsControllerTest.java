@@ -1,13 +1,17 @@
 package com.trip.whereU.directions.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.times;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,27 +20,50 @@ import com.trip.whereU.directions.dto.DirectionsEstimateRequest;
 import com.trip.whereU.directions.dto.DirectionsEstimateResponse;
 import com.trip.whereU.directions.dto.DirectionsStatus;
 import com.trip.whereU.directions.exception.DirectionsDestinationNotFoundException;
+import com.trip.whereU.directions.ratelimit.ClientIpResolver;
+import com.trip.whereU.directions.ratelimit.DirectionsRateLimitFilter;
+import com.trip.whereU.directions.ratelimit.DirectionsRateLimitService;
+import com.trip.whereU.directions.ratelimit.RateLimitDecision;
 import com.trip.whereU.directions.service.DirectionsService;
 import java.time.OffsetDateTime;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@Import(ClientIpResolver.class)
 @WebMvcTest(DirectionsController.class)
 class DirectionsControllerTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+	@Autowired
+	private ApplicationContext applicationContext;
 
 	@MockitoBean
 	private DirectionsService directionsService;
+	@MockitoBean
+	private DirectionsRateLimitService rateLimitService;
+
+	@BeforeEach
+	void setUp() {
+		given(rateLimitService.tryAcquire(anyString())).willReturn(RateLimitDecision.permitted());
+	}
+
+	@Test
+	void registersDirectionsRateLimitFilterExactlyOnce() {
+		assertThat(applicationContext.getBeansOfType(DirectionsRateLimitFilter.class)).hasSize(1);
+	}
 
 	@Test
 	void wrapsAvailabilityInApiResponse() throws Exception {
@@ -75,6 +102,25 @@ class DirectionsControllerTest {
 				.andExpect(jsonPath("$.data.tollFare").value(0))
 				.andExpect(jsonPath("$.data.calculatedAt").value("2026-07-20T15:00:00+09:00"))
 				.andExpect(jsonPath("$.data.fallbackReason").doesNotExist());
+	}
+
+	@Test
+	void rateLimitedEstimateDoesNotReachController() throws Exception {
+		given(rateLimitService.tryAcquire(anyString())).willReturn(RateLimitDecision.rejected(6));
+
+		mockMvc.perform(post("/api/directions/estimate")
+					.contentType(MediaType.APPLICATION_JSON)
+					.content(validRequest()))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(header().string(HttpHeaders.RETRY_AFTER, "6"))
+				.andExpect(jsonPath("$.success").value(false))
+				.andExpect(jsonPath("$.data").doesNotExist())
+				.andExpect(jsonPath("$.message").value(
+						"자동차 시간 요청이 많아 네이버 지도 길찾기로 전환합니다."
+				));
+
+		then(directionsService).shouldHaveNoInteractions();
+		then(rateLimitService).should(times(1)).tryAcquire(anyString());
 	}
 
 	@ParameterizedTest
