@@ -22,6 +22,13 @@ import com.trip.whereU.tourism.repository.TourismContentRepository;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -41,6 +48,13 @@ class DirectionsServiceTest {
 	private DirectionsUsageService usageService;
 	@Mock
 	private NaverDirectionsClient client;
+
+	private final ExecutorService executor = Executors.newFixedThreadPool(2);
+
+	@AfterEach
+	void shutDownExecutor() {
+		executor.shutdownNow();
+	}
 
 	@Test
 	void returnsAvailableWhenMonthlyUsageIsAvailable() {
@@ -196,6 +210,52 @@ class DirectionsServiceTest {
 	}
 
 	@Test
+	void concurrentSameRouteFallbackRunsOnceAndLaterRequestRetries() throws Exception {
+		CountDownLatch clientStarted = new CountDownLatch(1);
+		CountDownLatch releaseClient = new CountDownLatch(1);
+		AtomicInteger clientCalls = new AtomicInteger();
+		NaverDirectionsResult success = result(25, 12_300, 0);
+		given(tourismContentRepository.findByContentId("126508"))
+				.willReturn(Optional.of(content("126508", "경복궁", 37.578822, 126.976993)));
+		given(usageService.reserveCurrentMonth()).willReturn(true);
+		given(client.getDrivingEstimate(37.5665, 126.978, 37.578822, 126.976993))
+				.willAnswer(invocation -> {
+					if (clientCalls.getAndIncrement() == 0) {
+						clientStarted.countDown();
+						assertThat(releaseClient.await(5, TimeUnit.SECONDS)).isTrue();
+						return Optional.empty();
+					}
+					return Optional.of(success);
+				});
+
+		ObservedInFlightMap observedMap = new ObservedInFlightMap();
+		DirectionsService service = service(new DirectionsRequestCoordinator(observedMap));
+		Future<DirectionsEstimateResponse> first = executor.submit(() -> service.estimate(request()));
+		assertThat(clientStarted.await(5, TimeUnit.SECONDS)).isTrue();
+		Future<DirectionsEstimateResponse> second =
+				executor.submit(() -> service.estimate(request()));
+		assertThat(observedMap.awaitFollower()).isTrue();
+		releaseClient.countDown();
+
+		DirectionsEstimateResponse fallback = fallback(
+				"126508", "경복궁", DirectionsFallbackReason.ROUTE_NOT_FOUND
+		);
+		assertThat(first.get(5, TimeUnit.SECONDS)).isEqualTo(fallback);
+		assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(fallback);
+		then(usageService).should(times(1)).reserveCurrentMonth();
+		then(client).should(times(1)).getDrivingEstimate(
+				37.5665, 126.978, 37.578822, 126.976993
+		);
+
+		DirectionsEstimateResponse later = service.estimate(request());
+		assertThat(later).isEqualTo(available("126508", "경복궁", success));
+		then(usageService).should(times(2)).reserveCurrentMonth();
+		then(client).should(times(2)).getDrivingEstimate(
+				37.5665, 126.978, 37.578822, 126.976993
+		);
+	}
+
+	@Test
 	void throwsNotFoundForUnknownDestinationContentId() {
 		given(tourismContentRepository.findByContentId("missing")).willReturn(Optional.empty());
 
@@ -209,6 +269,10 @@ class DirectionsServiceTest {
 	}
 
 	private DirectionsService service() {
+		return service(new DirectionsRequestCoordinator());
+	}
+
+	private DirectionsService service(DirectionsRequestCoordinator requestCoordinator) {
 		return new DirectionsService(
 				tourismContentRepository,
 				usageService,
@@ -220,7 +284,8 @@ class DirectionsServiceTest {
 						50_000,
 						10,
 						100
-				)
+				),
+				requestCoordinator
 		);
 	}
 

@@ -28,17 +28,20 @@ public class DirectionsService {
 	private final TourismContentRepository tourismContentRepository;
 	private final DirectionsUsageService usageService;
 	private final NaverDirectionsClient client;
+	private final DirectionsRequestCoordinator requestCoordinator;
 	private final Cache<DirectionsCacheKey, DirectionsEstimateResponse> cache;
 
 	public DirectionsService(
 			TourismContentRepository tourismContentRepository,
 			DirectionsUsageService usageService,
 			NaverDirectionsClient client,
-			NaverDirectionsProperties properties
+			NaverDirectionsProperties properties,
+			DirectionsRequestCoordinator requestCoordinator
 	) {
 		this.tourismContentRepository = tourismContentRepository;
 		this.usageService = usageService;
 		this.client = client;
+		this.requestCoordinator = requestCoordinator;
 		this.cache = Caffeine.newBuilder()
 				.expireAfterWrite(Duration.ofMinutes(properties.directionsCacheTtlMinutes()))
 				.maximumSize(properties.directionsCacheMaximumSize())
@@ -71,10 +74,23 @@ public class DirectionsService {
 			return cachedResponse;
 		}
 
+		return requestCoordinator.execute(cacheKey, () -> {
+			DirectionsEstimateResponse responseAfterWait = cache.getIfPresent(cacheKey);
+			if (responseAfterWait != null) {
+				return responseAfterWait;
+			}
+			return loadEstimate(request, destination, cacheKey);
+		});
+	}
+
+	private DirectionsEstimateResponse loadEstimate(
+			DirectionsEstimateRequest request,
+			TourismContent destination,
+			DirectionsCacheKey cacheKey
+	) {
 		if (!usageService.reserveCurrentMonth()) {
 			return fallback(destination, DirectionsFallbackReason.MONTHLY_LIMIT_REACHED);
 		}
-
 		try {
 			Optional<NaverDirectionsResult> result = client.getDrivingEstimate(
 					request.originLatitude(),
@@ -120,11 +136,4 @@ public class DirectionsService {
 		return BigDecimal.valueOf(coordinate).setScale(3, RoundingMode.HALF_UP);
 	}
 
-	private record DirectionsCacheKey(
-			BigDecimal originLatitude,
-			BigDecimal originLongitude,
-			String destinationContentId,
-			String option
-	) {
-	}
 }
