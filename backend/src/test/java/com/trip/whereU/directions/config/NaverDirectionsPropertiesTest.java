@@ -34,9 +34,15 @@ class NaverDirectionsPropertiesTest {
 						"naver.maps.directions-base-url=https://example.com/directions",
 						"naver.maps.directions-connect-timeout=3s",
 						"naver.maps.directions-read-timeout=7s",
-						"naver.maps.directions-monthly-safe-limit=" + monthlySafeLimit,
-						"naver.maps.directions-cache-ttl-minutes=10",
-						"naver.maps.directions-cache-maximum-size=10000"
+					"naver.maps.directions-monthly-safe-limit=" + monthlySafeLimit,
+					"naver.maps.directions-cache-ttl-minutes=10",
+					"naver.maps.directions-cache-maximum-size=10000",
+					"directions.rate-limit.enabled=true",
+					"directions.rate-limit.minute-capacity=10",
+					"directions.rate-limit.minute-refill-tokens=10",
+					"directions.rate-limit.daily-capacity=100",
+					"directions.rate-limit.cache-maximum-size=10000",
+					"directions.rate-limit.cache-expire-after-hours=24"
 				);
 	}
 }

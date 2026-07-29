@@ -14,3 +14,12 @@ naver:
     directions-connect-timeout: 3s
     directions-read-timeout: 7s
     directions-monthly-safe-limit: 50000
+
+directions:
+  rate-limit:
+    enabled: true
+    minute-capacity: 10
+    minute-refill-tokens: 10
+    daily-capacity: 100
+    cache-maximum-size: 10000
+    cache-expire-after-hours: 24

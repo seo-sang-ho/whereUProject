@@ -43,3 +43,12 @@ naver:
     directions-cache-maximum-size: ${NAVER_DIRECTIONS_CACHE_MAXIMUM_SIZE:10000}
     api-key-id: ${NAVER_MAPS_API_KEY_ID:}
     api-key: ${NAVER_MAPS_API_KEY:}
+
+directions:
+  rate-limit:
+    enabled: ${DIRECTIONS_RATE_LIMIT_ENABLED:true}
+    minute-capacity: ${DIRECTIONS_RATE_LIMIT_MINUTE_CAPACITY:10}
+    minute-refill-tokens: ${DIRECTIONS_RATE_LIMIT_MINUTE_REFILL_TOKENS:10}
+    daily-capacity: ${DIRECTIONS_RATE_LIMIT_DAILY_CAPACITY:100}
+    cache-maximum-size: ${DIRECTIONS_RATE_LIMIT_CACHE_MAXIMUM_SIZE:10000}
+    cache-expire-after-hours: ${DIRECTIONS_RATE_LIMIT_CACHE_EXPIRE_AFTER_HOURS:24}
